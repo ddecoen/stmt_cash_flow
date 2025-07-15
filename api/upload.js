@@ -154,11 +154,10 @@ function generateCashFlowStatement(records) {
     // Build operating activities with exact format
     const operatingActivities = [];
     
-    // Start with net loss (convert to thousands)
-    const netIncomeThousands = Math.round(netIncome / 1000);
+    // Start with net loss (use actual amounts)
     operatingActivities.push({ 
         description: netIncome < 0 ? 'Net loss' : 'Net income', 
-        amount: netIncomeThousands, 
+        amount: netIncome, 
         isMainItem: true 
     });
     
@@ -172,7 +171,7 @@ function generateCashFlowStatement(records) {
     // Add specific adjustment items
     operatingActivities.push({ 
         description: 'Depreciation and amortization expense', 
-        amount: 21, // This would be calculated from actual data
+        amount: 21000, // This would be calculated from actual data
         isAdjustment: true 
     });
     
@@ -185,16 +184,16 @@ function generateCashFlowStatement(records) {
     
     // Add specific line items with actual data or template values
     const operatingLineItems = [
-        { name: 'Accounts receivable', templateAmount: -626 },
-        { name: 'Prepaid expenses and other assets', templateAmount: -224 },
-        { name: 'Accounts payable', templateAmount: 42 },
-        { name: 'Accrued expenses and other liabilities', templateAmount: 451 },
-        { name: 'Deferred revenue', templateAmount: 232 }
+        { name: 'Accounts receivable', templateAmount: -626000 },
+        { name: 'Prepaid expenses and other assets', templateAmount: -224000 },
+        { name: 'Accounts payable', templateAmount: 42000 },
+        { name: 'Accrued expenses and other liabilities', templateAmount: 451000 },
+        { name: 'Deferred revenue', templateAmount: 232000 }
     ];
     
     operatingLineItems.forEach(({ name, templateAmount }) => {
         const actualAmount = lineItems.operating[name] ? 
-            Math.round(lineItems.operating[name] / 1000) : templateAmount;
+            lineItems.operating[name] : templateAmount;
         operatingActivities.push({ 
             description: name, 
             amount: actualAmount, 
@@ -218,7 +217,7 @@ function generateCashFlowStatement(records) {
     
     investingActivities.push({ 
         description: 'Purchases of property and equipment', 
-        amount: -40, // This would be calculated from actual data
+        amount: -40000, // This would be calculated from actual data
         isMainItem: true 
     });
     
@@ -234,7 +233,7 @@ function generateCashFlowStatement(records) {
     
     financingActivities.push({ 
         description: 'Proceeds from stock issuance', 
-        amount: 221, // This would be calculated from actual data
+        amount: 221000, // This would be calculated from actual data
         isMainItem: true 
     });
     
@@ -249,7 +248,7 @@ function generateCashFlowStatement(records) {
     const netCashChange = operatingTotal + investingTotal + financingTotal;
     
     // Calculate cash balances (these would come from actual balance sheet data)
-    beginningCash = 28226; // This should be extracted from the balance sheet
+    beginningCash = 28226000; // This should be extracted from the balance sheet
     endingCash = beginningCash + netCashChange;
     
     return {
@@ -332,7 +331,7 @@ async function createExcelFile(cashFlow) {
                 worksheet.getCell(`B${row}`).value = item.amount;
                 worksheet.getCell(`B${row}`).numFmt = '#,##0';
                 if (item.amount < 0) {
-                    worksheet.getCell(`B${row}`).value = `(${Math.abs(item.amount)})`;
+                    worksheet.getCell(`B${row}`).value = `(${Math.abs(item.amount).toLocaleString()})`;
                 }
             }
             
@@ -355,7 +354,7 @@ async function createExcelFile(cashFlow) {
         worksheet.getCell(`B${row}`).value = item.amount;
         worksheet.getCell(`B${row}`).numFmt = '#,##0';
         if (item.amount < 0) {
-            worksheet.getCell(`B${row}`).value = `(${Math.abs(item.amount)})`;
+            worksheet.getCell(`B${row}`).value = `(${Math.abs(item.amount).toLocaleString()})`;
         }
         
         if (item.isTotal) {
@@ -375,7 +374,7 @@ async function createExcelFile(cashFlow) {
         worksheet.getCell(`B${row}`).value = item.amount;
         worksheet.getCell(`B${row}`).numFmt = '#,##0';
         if (item.amount < 0) {
-            worksheet.getCell(`B${row}`).value = `(${Math.abs(item.amount)})`;
+            worksheet.getCell(`B${row}`).value = `(${Math.abs(item.amount).toLocaleString()})`;
         }
         
         if (item.isTotal) {
@@ -392,7 +391,7 @@ async function createExcelFile(cashFlow) {
     worksheet.getCell(`B${row}`).font = { bold: true };
     worksheet.getCell(`B${row}`).numFmt = '#,##0';
     if (cashFlow.netCashChange < 0) {
-        worksheet.getCell(`B${row}`).value = `(${Math.abs(cashFlow.netCashChange)})`;
+        worksheet.getCell(`B${row}`).value = `(${Math.abs(cashFlow.netCashChange).toLocaleString()})`;
     }
     row++;
     
