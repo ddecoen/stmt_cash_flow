@@ -1,15 +1,8 @@
 {
   "version": 2,
-  "builds": [
-    {
-      "src": "api/handler.go",
-      "use": "@vercel/go"
+  "functions": {
+    "api/*.js": {
+      "runtime": "nodejs18.x"
     }
-  ],
-  "routes": [
-    {
-      "src": "/(.*)",
-      "dest": "/api/handler"
-    }
-  ]
+  }
 }
