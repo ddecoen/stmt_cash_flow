@@ -8,9 +8,13 @@ const upload = multer({ storage: multer.memoryStorage() });
 
 // Parse amount from string
 function parseAmount(amountStr) {
-    if (!amountStr || amountStr.trim() === '') return 0;
+    if (!amountStr) return 0;
     
-    let cleaned = amountStr.toString().trim()
+    // Convert to string first, then trim
+    const strValue = amountStr.toString().trim();
+    if (strValue === '') return 0;
+    
+    let cleaned = strValue
         .replace(/,/g, '')
         .replace(/\$/g, '')
         .replace(/\(/g, '-')
@@ -125,10 +129,10 @@ function generateCashFlowStatement(records) {
             netIncome = parseAmount(record.variance) || 0;
         }
         
-        // Extract cash balances - ending cash from current amount, beginning from comparison
+        // Extract cash balances - ending cash from current amount, beginning from prior amount
         if (record.account && record.account.toLowerCase().includes('total - 11000 - cash and cash equivalents')) {
-            endingCash = parseAmount(record.amount) || 0;
-            beginningCash = parseAmount(record.comparisonAmount) || 0;
+            endingCash = parseAmount(record.currentAmount) || 0;
+            beginningCash = parseAmount(record.priorAmount) || 0;
         }
     }
     
