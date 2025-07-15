@@ -22,40 +22,75 @@ function parseAmount(amountStr) {
     return isNaN(parsed) ? 0 : parsed;
 }
 
-// Categorize account for cash flow
+// Categorize account for cash flow with specific line items
 function categorizeAccount(accountName, accountType) {
     const name = accountName.toLowerCase();
     const type = (accountType || '').toLowerCase();
     
     // Cash accounts
-    if (name.includes('cash') || name.includes('bank') || name.includes('money market') || name.includes('investment')) {
+    if (name.includes('cash') || name.includes('bank') || name.includes('money market')) {
         return 'cash';
     }
     
-    // Operating activities (working capital)
-    if (name.includes('receivable') || name.includes('prepaid') || name.includes('unbilled') ||
-        name.includes('payable') || name.includes('accrued') || name.includes('wages') ||
-        name.includes('payroll') || name.includes('deferred') || name.includes('credit card') ||
-        name.includes('benefits') || name.includes('contributions')) {
-        return 'operating';
+    // Operating activities - specific categorization
+    if (name.includes('receivable')) {
+        return { category: 'operating', lineItem: 'Accounts receivable' };
+    }
+    if (name.includes('prepaid') || name.includes('other assets')) {
+        return { category: 'operating', lineItem: 'Prepaid expenses and other assets' };
+    }
+    if (name.includes('payable')) {
+        return { category: 'operating', lineItem: 'Accounts payable' };
+    }
+    if (name.includes('accrued') && (name.includes('expense') || name.includes('liabilities'))) {
+        return { category: 'operating', lineItem: 'Accrued expenses and other liabilities' };
+    }
+    if (name.includes('accrued') && name.includes('compensation')) {
+        return { category: 'operating', lineItem: 'Accrued compensation and benefits' };
+    }
+    if (name.includes('deferred') && name.includes('revenue')) {
+        return { category: 'operating', lineItem: 'Deferred revenue' };
+    }
+    if (name.includes('customer') && name.includes('deposit')) {
+        return { category: 'operating', lineItem: 'Customer deposits' };
+    }
+    if (name.includes('deferred') && name.includes('contract')) {
+        return { category: 'operating', lineItem: 'Deferred contract acquisition costs' };
     }
     
     // Investing activities
     if (name.includes('equipment') || name.includes('furniture') || name.includes('computer') ||
-        name.includes('leasehold') || name.includes('software development') || name.includes('domain') ||
-        name.includes('capitalized') || name.includes('note receivable') || name.includes('security deposits') ||
-        name.includes('software rights')) {
-        return 'investing';
+        name.includes('property')) {
+        return { category: 'investing', lineItem: 'Purchases of property and equipment' };
+    }
+    if (name.includes('capitalized') && name.includes('software')) {
+        return { category: 'investing', lineItem: 'Capitalized internal-use software' };
+    }
+    if (name.includes('business') && name.includes('combination')) {
+        return { category: 'investing', lineItem: 'Business combination, net of cash acquired' };
+    }
+    if (name.includes('short-term') && name.includes('investment')) {
+        if (name.includes('purchase')) {
+            return { category: 'investing', lineItem: 'Purchases of short-term investments' };
+        }
+        if (name.includes('proceeds') || name.includes('sale')) {
+            return { category: 'investing', lineItem: 'Proceeds from sales of short-term investments' };
+        }
+        if (name.includes('maturities')) {
+            return { category: 'investing', lineItem: 'Proceeds from maturities of short-term investments' };
+        }
     }
     
     // Financing activities
-    if (type.includes('equity') || name.includes('stock') || name.includes('capital') ||
-        name.includes('earnings') || name.includes('income') || name.includes('opening balance') ||
-        name.includes('lease liabilities')) {
-        return 'financing';
+    if (name.includes('taxes') && name.includes('equity')) {
+        return { category: 'financing', lineItem: 'Taxes paid related to net share settlement of equity awards' };
+    }
+    if (name.includes('acquisition') && name.includes('holdback')) {
+        return { category: 'financing', lineItem: 'Payments related to acquisition holdback' };
     }
     
-    return 'operating'; // Default
+    // Default to operating with generic description
+    return { category: 'operating', lineItem: 'Other' };
 }
 
 // Adjust amount for cash flow impact
@@ -68,82 +103,124 @@ function adjustAmountForCashFlow(amount, accountType) {
     return amount;
 }
 
-// Generate cash flow statement
+// Generate cash flow statement with condensed format
 function generateCashFlowStatement(records) {
-    const operatingItems = [];
-    const investingItems = [];
-    const financingItems = [];
+    // Initialize line item aggregators
+    const lineItems = {
+        operating: {},
+        investing: {},
+        financing: {}
+    };
     
-    // Find net income
+    // Find net income/loss
     let netIncome = 0;
     for (const record of records) {
-        if (record.account && record.account.toLowerCase().includes('net income')) {
+        if (record.account && (record.account.toLowerCase().includes('net income') || 
+                              record.account.toLowerCase().includes('net loss'))) {
             netIncome = record.variance || 0;
             break;
         }
-    }
-    
-    // Add net income to operating activities
-    if (netIncome !== 0) {
-        operatingItems.push({ description: 'Net Income', amount: netIncome });
     }
     
     // Process other accounts
     for (const record of records) {
         if (!record.variance || record.variance === 0) continue;
         if (record.account.toLowerCase().includes('total')) continue;
-        if (record.account.toLowerCase().includes('net income')) continue;
+        if (record.account.toLowerCase().includes('net income') || 
+            record.account.toLowerCase().includes('net loss')) continue;
         
-        const category = categorizeAccount(record.account, record.accountType);
-        const cleanName = record.account.split(' - ').slice(1).join(' - ') || record.account;
+        const categorization = categorizeAccount(record.account, record.accountType);
+        if (categorization === 'cash') continue; // Skip cash items
+        
         const adjustedAmount = adjustAmountForCashFlow(record.variance, record.accountType);
         
-        const item = {
-            description: cleanName,
-            amount: adjustedAmount
-        };
-        
-        switch (category) {
-            case 'operating':
-                operatingItems.push(item);
-                break;
-            case 'investing':
-                investingItems.push(item);
-                break;
-            case 'financing':
-                financingItems.push(item);
-                break;
-            // Skip cash items as they're the result, not the cause
+        if (typeof categorization === 'object') {
+            const { category, lineItem } = categorization;
+            
+            if (!lineItems[category][lineItem]) {
+                lineItems[category][lineItem] = 0;
+            }
+            lineItems[category][lineItem] += adjustedAmount;
         }
     }
     
-    // Calculate totals
-    const operatingTotal = operatingItems.reduce((sum, item) => sum + item.amount, 0);
-    const investingTotal = investingItems.reduce((sum, item) => sum + item.amount, 0);
-    const financingTotal = financingItems.reduce((sum, item) => sum + item.amount, 0);
+    // Build operating activities with standard format
+    const operatingActivities = [];
     
-    // Add subtotals
-    operatingItems.push({ description: 'Net Cash from Operating Activities', amount: operatingTotal });
-    investingItems.push({ description: 'Net Cash from Investing Activities', amount: investingTotal });
-    financingItems.push({ description: 'Net Cash from Financing Activities', amount: financingTotal });
+    // Start with net loss
+    if (netIncome < 0) {
+        operatingActivities.push({ description: 'Net loss', amount: netIncome, isMainItem: true });
+    } else {
+        operatingActivities.push({ description: 'Net income', amount: netIncome, isMainItem: true });
+    }
+    
+    // Add adjustments section
+    operatingActivities.push({ description: 'Adjustments to reconcile net loss to cash from operating activities:', amount: null, isHeader: true });
+    
+    // Add standard adjustment items (these would be calculated from actual data)
+    operatingActivities.push({ description: 'Stock-based compensation expense, net of amounts capitalized', amount: 0, isAdjustment: true });
+    operatingActivities.push({ description: 'Depreciation and amortization expense', amount: 0, isAdjustment: true });
+    operatingActivities.push({ description: 'Non-cash operating lease cost', amount: 0, isMainItem: true });
+    operatingActivities.push({ description: 'Accretion of discounts on marketable securities', amount: 0, isAdjustment: true });
+    operatingActivities.push({ description: 'Deferred income taxes', amount: 0, isMainItem: true });
+    operatingActivities.push({ description: 'Other', amount: 0, isAdjustment: true });
+    
+    // Add working capital changes
+    operatingActivities.push({ description: 'Changes in operating assets and liabilities:', amount: null, isHeader: true });
+    
+    // Add line items from aggregated data
+    Object.entries(lineItems.operating).forEach(([lineItem, amount]) => {
+        if (amount !== 0) {
+            operatingActivities.push({ description: lineItem, amount: amount, isWorkingCapital: true });
+        }
+    });
+    
+    // Calculate operating total
+    const operatingTotal = operatingActivities
+        .filter(item => item.amount !== null)
+        .reduce((sum, item) => sum + item.amount, 0);
+    
+    operatingActivities.push({ description: 'Net cash provided by (used in) operating activities', amount: operatingTotal, isTotal: true });
+    
+    // Build investing activities
+    const investingActivities = [];
+    Object.entries(lineItems.investing).forEach(([lineItem, amount]) => {
+        if (amount !== 0) {
+            investingActivities.push({ description: lineItem, amount: amount, isMainItem: true });
+        }
+    });
+    
+    const investingTotal = investingActivities.reduce((sum, item) => sum + item.amount, 0);
+    investingActivities.push({ description: 'Net cash provided by (used in) investing activities', amount: investingTotal, isTotal: true });
+    
+    // Build financing activities
+    const financingActivities = [];
+    Object.entries(lineItems.financing).forEach(([lineItem, amount]) => {
+        if (amount !== 0) {
+            financingActivities.push({ description: lineItem, amount: amount, isMainItem: true });
+        }
+    });
+    
+    const financingTotal = financingActivities.reduce((sum, item) => sum + item.amount, 0);
+    financingActivities.push({ description: 'Net cash provided by (used in) financing activities', amount: financingTotal, isTotal: true });
     
     return {
-        operatingActivities: operatingItems,
-        investingActivities: investingItems,
-        financingActivities: financingItems,
+        operatingActivities: operatingActivities,
+        investingActivities: investingActivities,
+        financingActivities: financingActivities,
         netCashFlow: operatingTotal + investingTotal + financingTotal,
         periodStart: 'Mar 2025',
         periodEnd: 'Jun 2025'
     };
 }
 
-// Create Excel file
+// Create Excel file with condensed format
 async function createExcelFile(cashFlow) {
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Cash Flow Statement');
     
     // Set column widths
-    worksheet.getColumn(1).width = 50;
+    worksheet.getColumn(1).width = 60;
     worksheet.getColumn(2).width = 20;
     
     let row = 1;
@@ -161,32 +238,54 @@ async function createExcelFile(cashFlow) {
     worksheet.mergeCells(`A${row}:B${row}`);
     row += 2;
     
-    // Operating Activities
-    worksheet.getCell(`A${row}`).value = 'CASH FLOWS FROM OPERATING ACTIVITIES';
+    // Operating Activities Header
+    worksheet.getCell(`A${row}`).value = 'Cash flows from operating activities';
     worksheet.getCell(`A${row}`).font = { bold: true, size: 12 };
-    worksheet.getCell(`A${row}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE6E6FA' } };
+    worksheet.getCell(`A${row}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFB3D9FF' } };
     worksheet.mergeCells(`A${row}:B${row}`);
     row++;
     
+    // Operating Activities Items
     for (const item of cashFlow.operatingActivities) {
-        worksheet.getCell(`A${row}`).value = item.description;
-        worksheet.getCell(`B${row}`).value = item.amount;
-        worksheet.getCell(`B${row}`).numFmt = '$#,##0.00';
-        
-        if (item.description.includes('Net Cash from')) {
-            worksheet.getCell(`A${row}`).font = { bold: true };
-            worksheet.getCell(`B${row}`).font = { bold: true };
-            worksheet.getCell(`A${row}`).border = { top: { style: 'thin' } };
-            worksheet.getCell(`B${row}`).border = { top: { style: 'thin' } };
+        if (item.amount === null && item.isHeader) {
+            // Header items (like "Adjustments to reconcile...")
+            worksheet.getCell(`A${row}`).value = item.description;
+            worksheet.getCell(`A${row}`).font = { italic: true };
+            worksheet.getCell(`A${row}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFB3D9FF' } };
+            worksheet.mergeCells(`A${row}:B${row}`);
+        } else {
+            worksheet.getCell(`A${row}`).value = item.description;
+            
+            if (item.amount !== null) {
+                worksheet.getCell(`B${row}`).value = item.amount;
+                worksheet.getCell(`B${row}`).numFmt = '$#,##0.00';
+            }
+            
+            // Apply styling based on item type
+            if (item.isTotal) {
+                worksheet.getCell(`A${row}`).font = { bold: true };
+                worksheet.getCell(`B${row}`).font = { bold: true };
+                worksheet.getCell(`A${row}`).border = { top: { style: 'thin' } };
+                worksheet.getCell(`B${row}`).border = { top: { style: 'thin' } };
+                worksheet.getCell(`A${row}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFB3D9FF' } };
+            } else if (item.isAdjustment || item.isWorkingCapital) {
+                // Indent adjustment and working capital items
+                worksheet.getCell(`A${row}`).value = '  ' + item.description;
+                if (item.isAdjustment) {
+                    worksheet.getCell(`A${row}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFB3D9FF' } };
+                }
+            } else if (item.isMainItem) {
+                worksheet.getCell(`A${row}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFB3D9FF' } };
+            }
         }
         row++;
     }
     row++;
     
-    // Investing Activities
-    worksheet.getCell(`A${row}`).value = 'CASH FLOWS FROM INVESTING ACTIVITIES';
+    // Investing Activities Header
+    worksheet.getCell(`A${row}`).value = 'Cash flows from investing activities';
     worksheet.getCell(`A${row}`).font = { bold: true, size: 12 };
-    worksheet.getCell(`A${row}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE6E6FA' } };
+    worksheet.getCell(`A${row}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFB3D9FF' } };
     worksheet.mergeCells(`A${row}:B${row}`);
     row++;
     
@@ -195,20 +294,23 @@ async function createExcelFile(cashFlow) {
         worksheet.getCell(`B${row}`).value = item.amount;
         worksheet.getCell(`B${row}`).numFmt = '$#,##0.00';
         
-        if (item.description.includes('Net Cash from')) {
+        if (item.isTotal) {
             worksheet.getCell(`A${row}`).font = { bold: true };
             worksheet.getCell(`B${row}`).font = { bold: true };
             worksheet.getCell(`A${row}`).border = { top: { style: 'thin' } };
             worksheet.getCell(`B${row}`).border = { top: { style: 'thin' } };
+            worksheet.getCell(`A${row}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFB3D9FF' } };
+        } else {
+            worksheet.getCell(`A${row}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFB3D9FF' } };
         }
         row++;
     }
     row++;
     
-    // Financing Activities
-    worksheet.getCell(`A${row}`).value = 'CASH FLOWS FROM FINANCING ACTIVITIES';
+    // Financing Activities Header
+    worksheet.getCell(`A${row}`).value = 'Cash flows from financing activities';
     worksheet.getCell(`A${row}`).font = { bold: true, size: 12 };
-    worksheet.getCell(`A${row}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE6E6FA' } };
+    worksheet.getCell(`A${row}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFB3D9FF' } };
     worksheet.mergeCells(`A${row}:B${row}`);
     row++;
     
@@ -217,11 +319,14 @@ async function createExcelFile(cashFlow) {
         worksheet.getCell(`B${row}`).value = item.amount;
         worksheet.getCell(`B${row}`).numFmt = '$#,##0.00';
         
-        if (item.description.includes('Net Cash from')) {
+        if (item.isTotal) {
             worksheet.getCell(`A${row}`).font = { bold: true };
             worksheet.getCell(`B${row}`).font = { bold: true };
             worksheet.getCell(`A${row}`).border = { top: { style: 'thin' } };
             worksheet.getCell(`B${row}`).border = { top: { style: 'thin' } };
+            worksheet.getCell(`A${row}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFB3D9FF' } };
+        } else {
+            worksheet.getCell(`A${row}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFB3D9FF' } };
         }
         row++;
     }
