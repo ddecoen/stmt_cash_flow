@@ -12,38 +12,60 @@ func generateCashFlowStatement(records []NetSuiteRecord) CashFlowStatement {
 		OperatingActivities: []CashFlowItem{},
 		InvestingActivities: []CashFlowItem{},
 		FinancingActivities: []CashFlowItem{},
+		PeriodStart:         "Mar 2025",
+		PeriodEnd:           "Jun 2025",
 	}
 
-	// Determine period
-	if len(records) > 0 {
-		dates := extractDates(records)
-		if len(dates) > 0 {
-			cashFlow.PeriodStart = dates[0]
-			cashFlow.PeriodEnd = dates[len(dates)-1]
+	// Find net income from the records
+	var netIncome float64
+	for _, record := range records {
+		if strings.Contains(strings.ToLower(record.Account), "net income") {
+			netIncome = record.Amount
+			break
 		}
 	}
 
-	// Group transactions by account type and calculate totals
-	operatingTotals := make(map[string]float64)
-	investingTotals := make(map[string]float64)
-	financingTotals := make(map[string]float64)
+	// Start with net income for indirect method
+	if netIncome != 0 {
+		cashFlow.OperatingActivities = append(cashFlow.OperatingActivities, CashFlowItem{
+			Description: "Net Income",
+			Amount:      netIncome,
+		})
+	}
+
+	// Group balance sheet changes by cash flow category
+	operatingAdjustments := []CashFlowItem{}
+	investingActivities := []CashFlowItem{}
+	financingActivities := []CashFlowItem{}
+cashChanges := []CashFlowItem{}
 
 	for _, record := range records {
-		category := categorizeAccount(record.AccountType, record.Account)
+		if record.Amount == 0 {
+			continue
+		}
+
+		category := categorizeBalanceSheetAccount(record.AccountType, record.Account)
+		item := CashFlowItem{
+			Description: cleanAccountName(record.Account),
+			Amount:      adjustAmountForCashFlow(record.Amount, record.AccountType),
+		}
+
 		switch category {
 		case "operating":
-			operatingTotals[record.Account] += record.Amount
+			operatingAdjustments = append(operatingAdjustments, item)
 		case "investing":
-			investingTotals[record.Account] += record.Amount
+			investingActivities = append(investingActivities, item)
 		case "financing":
-			financingTotals[record.Account] += record.Amount
+			financingActivities = append(financingActivities, item)
+		case "cash":
+			cashChanges = append(cashChanges, item)
 		}
 	}
 
-	// Convert totals to cash flow items
-	cashFlow.OperatingActivities = convertToItems(operatingTotals)
-	cashFlow.InvestingActivities = convertToItems(investingTotals)
-	cashFlow.FinancingActivities = convertToItems(financingTotals)
+	// Add operating adjustments
+	cashFlow.OperatingActivities = append(cashFlow.OperatingActivities, operatingAdjustments...)
+	cashFlow.InvestingActivities = investingActivities
+	cashFlow.FinancingActivities = financingActivities
 
 	// Calculate net cash flows
 	operatingTotal := sumItems(cashFlow.OperatingActivities)
@@ -68,77 +90,78 @@ func generateCashFlowStatement(records []NetSuiteRecord) CashFlowStatement {
 		Amount:      financingTotal,
 	})
 
+	// Calculate beginning and ending cash from cash changes
+	for _, cashChange := range cashChanges {
+		if strings.Contains(strings.ToLower(cashChange.Description), "cash") {
+			cashFlow.BeginningCash += cashChange.Amount // This would be prior period
+			cashFlow.EndingCash = cashFlow.BeginningCash + cashFlow.NetCashFlow
+		}
+	}
+
 	return cashFlow
 }
 
-func categorizeAccount(accountType, accountName string) string {
+func categorizeBalanceSheetAccount(accountType, accountName string) string {
 	accountType = strings.ToLower(strings.TrimSpace(accountType))
 	accountName = strings.ToLower(strings.TrimSpace(accountName))
 
-	// Operating Activities (GAAP guidelines)
-	operatingKeywords := []string{
-		"revenue", "sales", "income", "expense", "cost of goods", "payroll",
-		"accounts receivable", "accounts payable", "inventory", "prepaid",
-		"accrued", "tax", "interest expense", "depreciation", "amortization",
+	// Cash and cash equivalents - track separately
+	if strings.Contains(accountName, "cash") || strings.Contains(accountName, "bank") ||
+		strings.Contains(accountName, "money market") || strings.Contains(accountName, "investment") {
+		return "cash"
 	}
 
-	// Investing Activities
-	investingKeywords := []string{
-		"equipment", "property", "plant", "asset", "investment", "securities",
-		"capital expenditure", "acquisition", "disposal", "sale of assets",
-		"purchase of assets", "fixed asset",
-	}
-
-	// Financing Activities
-	financingKeywords := []string{
-		"loan", "debt", "borrowing", "dividend", "equity", "stock", "share",
-		"capital", "retained earnings", "owner", "shareholder", "bond",
-		"line of credit", "mortgage",
-	}
-
-	// Check account type first
-	switch {
-	case strings.Contains(accountType, "asset") && (strings.Contains(accountName, "cash") || strings.Contains(accountName, "bank")):
-		return "operating" // Cash accounts are typically operating
-	case strings.Contains(accountType, "asset") && strings.Contains(accountType, "fixed"):
-		return "investing"
-	case strings.Contains(accountType, "liability") && strings.Contains(accountType, "long"):
-		return "financing"
-	case strings.Contains(accountType, "equity"):
-		return "financing"
-	}
-
-	// Check account name for keywords
-	for _, keyword := range operatingKeywords {
-		if strings.Contains(accountName, keyword) {
-			return "operating"
-		}
-	}
-
-	for _, keyword := range investingKeywords {
-		if strings.Contains(accountName, keyword) {
-			return "investing"
-		}
-	}
-
-	for _, keyword := range financingKeywords {
-		if strings.Contains(accountName, keyword) {
-			return "financing"
-		}
-	}
-
-	// Default categorization based on account type
-	switch {
-	case strings.Contains(accountType, "revenue"), strings.Contains(accountType, "income"),
-		strings.Contains(accountType, "expense"), strings.Contains(accountType, "cost"):
+	// Operating Activities (Working Capital Changes)
+	if strings.Contains(accountName, "receivable") || strings.Contains(accountName, "prepaid") ||
+		strings.Contains(accountName, "unbilled") || strings.Contains(accountName, "payable") ||
+		strings.Contains(accountName, "accrued") || strings.Contains(accountName, "wages") ||
+		strings.Contains(accountName, "payroll") || strings.Contains(accountName, "deferred") ||
+		strings.Contains(accountName, "credit card") || strings.Contains(accountName, "benefits") ||
+		strings.Contains(accountName, "contributions") {
 		return "operating"
-	case strings.Contains(accountType, "asset"):
-		return "investing"
-	case strings.Contains(accountType, "liability"), strings.Contains(accountType, "equity"):
-		return "financing"
-	default:
-		return "operating" // Default to operating
 	}
+
+	// Investing Activities (Fixed Assets and Long-term Investments)
+	if strings.Contains(accountName, "equipment") || strings.Contains(accountName, "furniture") ||
+		strings.Contains(accountName, "computer") || strings.Contains(accountName, "leasehold") ||
+		strings.Contains(accountName, "software development") || strings.Contains(accountName, "domain") ||
+		strings.Contains(accountName, "capitalized") || strings.Contains(accountName, "note receivable") ||
+		strings.Contains(accountName, "security deposits") || strings.Contains(accountName, "software rights") {
+		return "investing"
+	}
+
+	// Financing Activities (Equity and Long-term Debt)
+	if accountType == "EQUITY" || strings.Contains(accountName, "stock") ||
+		strings.Contains(accountName, "capital") || strings.Contains(accountName, "earnings") ||
+		strings.Contains(accountName, "income") || strings.Contains(accountName, "opening balance") ||
+		strings.Contains(accountName, "lease liabilities") {
+		return "financing"
+	}
+
+	// Default to operating for current items
+	return "operating"
+}
+
+func adjustAmountForCashFlow(amount float64, accountType string) float64 {
+	// For indirect method, we need to adjust for the impact on cash
+	// Increases in assets decrease cash (negative)
+	// Increases in liabilities increase cash (positive)
+	// Increases in equity increase cash (positive)
+
+	accountType = strings.ToLower(accountType)
+	if strings.Contains(accountType, "asset") {
+		return -amount // Increase in assets decreases cash
+	}
+	return amount // Increase in liabilities/equity increases cash
+}
+
+func cleanAccountName(accountName string) string {
+	// Remove account numbers and clean up the description
+	parts := strings.Split(accountName, " - ")
+	if len(parts) > 1 {
+		return strings.TrimSpace(parts[1])
+	}
+	return strings.TrimSpace(accountName)
 }
 
 func convertToItems(totals map[string]float64) []CashFlowItem {

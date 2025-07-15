@@ -133,16 +133,18 @@
         <div class="instructions">
             <h3>Instructions:</h3>
             <ul>
-                <li>Export your NetSuite data as a CSV file</li>
-                <li>Ensure the CSV includes columns for: Account, Account Type, Amount, Date, Description</li>
+                <li>Export your NetSuite <strong>Comparative Balance Sheet</strong> as a CSV file</li>
+                <li>Ensure the CSV includes columns for: Financial Row, Current Period Amount, Prior Period Amount, Variance</li>
+                <li>The application will use the <strong>indirect method</strong> to generate cash flows from balance sheet changes</li>
                 <li>Upload the CSV file using the form below</li>
                 <li>Download the generated GAAP-compliant Cash Flow Statement in Excel format</li>
             </ul>
+            <p><strong>Note:</strong> This tool analyzes balance sheet changes to create cash flow statements using the indirect method, which is standard for GAAP reporting.</p>
         </div>
 
         <form id="uploadForm" enctype="multipart/form-data">
             <div class="upload-area" id="uploadArea">
-                <p>Drag and drop your NetSuite CSV file here, or click to select</p>
+                <p>Drag and drop your NetSuite Balance Sheet CSV file here, or click to select</p>
                 <input type="file" id="csvfile" name="csvfile" accept=".csv" required>
             </div>
             <button type="submit" id="submitBtn">Generate Cash Flow Statement</button>

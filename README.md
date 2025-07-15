@@ -4,9 +4,10 @@ A Go web application that processes NetSuite CSV exports and generates GAAP-comp
 
 ## Features
 
-- **CSV Processing**: Parses NetSuite CSV exports with flexible column mapping
-- **GAAP Compliance**: Generates cash flow statements following Generally Accepted Accounting Principles
-- **Three Activity Categories**: Automatically categorizes transactions into Operating, Investing, and Financing activities
+- **Balance Sheet Analysis**: Parses NetSuite comparative balance sheet CSV exports
+- **Indirect Method**: Generates cash flow statements using the indirect method from balance sheet changes
+- **GAAP Compliance**: Follows Generally Accepted Accounting Principles for cash flow statement presentation
+- **Three Activity Categories**: Automatically categorizes balance sheet changes into Operating, Investing, and Financing activities
 - **Excel Export**: Creates professionally formatted Excel files with proper styling
 - **Web Interface**: User-friendly drag-and-drop file upload interface
 - **Vercel Ready**: Configured for serverless deployment on Vercel
@@ -46,51 +47,67 @@ The application will start on `http://localhost:8080`
 2. Upload a NetSuite CSV file using the web interface
 3. Download the generated Excel cash flow statement
 
-## NetSuite CSV Format
+## NetSuite Balance Sheet CSV Format
 
-Your NetSuite CSV export should include the following columns (column names are flexible):
+Your NetSuite CSV export should be a **Comparative Balance Sheet** with the following structure:
 
-| Required Column | Alternative Names | Description |
-|----------------|-------------------|-------------|
-| Account | Account Name, account_name | Account name from chart of accounts |
-| Account Type | account_type, Type | Account classification (Asset, Liability, etc.) |
-| Amount | Debit, Credit, Net Amount | Transaction amount |
-| Date | Transaction Date, Posting Date | Transaction date |
-| Description | Memo, Transaction Description | Transaction description |
-| Reference | Document Number, Transaction Number | Reference number (optional) |
+| Required Column | Description |
+|----------------|-------------|
+| Financial Row | Account name from chart of accounts |
+| Amount (Current Period) | Current period balance |
+| Comparison Amount (Prior Period) | Prior period balance for comparison |
+| Variance | Change between periods |
+| % Variance | Percentage change (optional) |
+
+### Export Instructions
+
+1. In NetSuite, go to **Reports > Financial > Balance Sheet**
+2. Select **Comparative** format
+3. Choose your current and prior periods (e.g., Jun 2025 vs Mar 2025)
+4. Export as CSV
+5. The data should start around row 12 (after headers and company info)
 
 ### Example CSV Structure
 
 ```csv
-Account,Account Type,Amount,Date,Description,Reference
-"Cash - Operating","Bank","10000.00","2024-01-15","Customer Payment","INV-001"
-"Equipment","Fixed Asset","-25000.00","2024-02-01","Equipment Purchase","PO-123"
-"Bank Loan","Long Term Liability","50000.00","2024-01-01","Loan Proceeds","LOAN-001"
+"Company Name",,,,
+"Comparative Balance Sheet",,,,
+"End of Jun 2025",,,,
+,,,,
+Financial Row,Amount (As of Jun 2025),Comparison Amount (As of Mar 2025),Variance,% Variance
+ASSETS,,,,
+Current Assets,,,,
+11001 - JPM operating,"$857,547.53","$849,488.16","$8,059.37",0.95%
+12001 - Accounts receivable,"$3,134,835.66","$2,551,017.30","$583,818.36",22.89%
 ```
 
-## Account Categorization
+## Cash Flow Categorization (Indirect Method)
 
-The application automatically categorizes accounts into cash flow activities:
+The application automatically categorizes balance sheet changes into cash flow activities:
 
-### Operating Activities
-- Revenue and income accounts
-- Operating expenses
-- Changes in working capital (A/R, A/P, Inventory)
-- Tax payments
-- Interest expense
+### Operating Activities (Working Capital Changes)
+- Accounts Receivable changes
+- Prepaid expenses changes
+- Accounts Payable changes
+- Accrued expenses changes
+- Deferred revenue changes
+- Other current asset/liability changes
+- **Note**: Increases in current assets decrease cash; increases in current liabilities increase cash
 
 ### Investing Activities
-- Purchase/sale of fixed assets
-- Equipment and property transactions
-- Investment securities
-- Capital expenditures
+- Fixed asset purchases/sales (Equipment, Furniture, Computer Equipment)
+- Capitalized software development
+- Leasehold improvements
+- Security deposits
+- Note receivable changes
+- Long-term investment changes
 
 ### Financing Activities
-- Loan proceeds and repayments
-- Equity transactions
-- Dividend payments
-- Stock issuance/repurchase
-- Owner contributions/distributions
+- Equity transactions (Stock issuances, Additional paid-in capital)
+- Retained earnings changes
+- Long-term debt changes
+- Operating lease liabilities
+- Owner/shareholder transactions
 
 ## Deployment to Vercel
 

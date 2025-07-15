@@ -1,0 +1,94 @@
+"Coder Technologies, Inc",,,,
+"Coder Technologies, Inc.",,,,
+Quarterly Comparative Balance Sheet,,,,
+End of Jun 2025,,,,
+,,,,
+Options: Activity Only,,,,
+Financial Row,Amount (As of Jun 2025),Comparison Amount (As of Mar 2025),Variance,% Variance
+ASSETS,,,,
+Current Assets,,,,
+Bank,,,,
+11000 - Cash and cash equivalents,,,,
+11001 - JPM operating - 3369,"$857,547.53 ","$849,488.16 ","$8,059.37 ",0.95%
+11002 - JPM money market - 6601,"$626,404.90 ","$626,518.06 ",($113.16),-0.02%
+11005 - JPM investment - 4586,"$21,998,175.02 ","$26,750,273.54 ","($4,752,098.52)",-17.76%
+Total - 11000 - Cash and cash equivalents,"$23,482,127.45 ","$28,226,279.76 ","($4,744,152.31)",-16.81%
+Total Bank,"$23,482,127.45 ","$28,226,279.76 ","($4,744,152.31)",-16.81%
+Accounts Receivable,,,,
+12000 - Receivables,,,,
+12001 - Accounts receivable - trade,"$3,134,835.66 ","$2,551,017.30 ","$583,818.36 ",22.89%
+12002 - Accounts receivable - other,$0.00 ,"($116,208.00)","$116,208.00 ",-100.00%
+Total - 12000 - Receivables,"$3,134,835.66 ","$2,434,809.30 ","$700,026.36 ",28.75%
+Total Accounts Receivable,"$3,134,835.66 ","$2,434,809.30 ","$700,026.36 ",28.75%
+Other Current Asset,,,,
+13000 - Prepaid expenses,,,,
+13010 - Prepaid software & subscriptions,"$461,532.93 ","$451,464.53 ","$10,068.40 ",2.23%
+13011 - Prepaid marketing expenses,"$644,927.89 ","$808,699.83 ","($163,771.94)",-20.25%
+13012 - Prepaid offsite/conference costs,"$189,374.88 ","$10,671.16 ","$178,703.72 ","1,674.64%"
+13013 - Prepaid insurance,"$26,980.22 ","($7,103.25)","$34,083.47 ",-479.83%
+13100 - Prepaid Other,"$213,055.02 ","$48,430.02 ","$164,625.00 ",339.92%
+Total - 13000 - Prepaid expenses,"$1,535,870.94 ","$1,312,162.29 ","$223,708.65 ",17.05%
+14000 - Other Current Assets,,,,
+14002 - Accounts receivable - unbilled,"$70,082.85 ","$144,482.85 ","($74,400.00)",-51.49%
+Total - 14000 - Other Current Assets,"$70,082.85 ","$144,482.85 ","($74,400.00)",-51.49%
+16110 - Domain purchase,"$42,669.00 ","$42,669.00 ",$0.00 ,0.00%
+16120 - Capitalized software development,"$3,410,788.88 ","$3,410,788.88 ",$0.00 ,0.00%
+16210 - AD - domain purchase,"($42,669.00)","($42,669.00)",$0.00 ,0.00%
+16220 - AD - software development,"($3,410,788.88)","($3,410,788.88)",$0.00 ,0.00%
+Total Other Current Asset,"$1,605,953.79 ","$1,456,645.14 ","$149,308.65 ",10.25%
+Total Current Assets,"$28,222,916.90 ","$32,117,734.20 ","($3,894,817.30)",-12.13%
+Fixed Assets,,,,
+15110 - Furniture and Equipment,"$48,382.63 ","$48,382.63 ",$0.00 ,0.00%
+15120 - Computer Equipment,"$242,007.47 ","$202,487.64 ","$39,519.83 ",19.52%
+15210 - AD - furniture and equipment,"($15,082.07)","($12,662.93)","($2,419.14)",19.10%
+15220 - AD - computer equipment,"($84,053.58)","($65,683.38)","($18,370.20)",27.97%
+Total Fixed Assets,"$191,254.45 ","$172,523.96 ","$18,730.49 ",10.86%
+Other Assets,,,,
+15011 - Capitalized software rights,"$100,000.00 ","$100,000.00 ",$0.00 ,0.00%
+15301 - Leasehold improvements,"$5,739.87 ","$5,739.87 ",$0.00 ,0.00%
+17001 - Note receivable,,,,
+17001 - Note receivable,"$84,778.34 ","$84,778.34 ",$0.00 ,0.00%
+17002 - Interest on note receivable,"$1,440.08 ","$1,440.08 ",$0.00 ,0.00%
+Total - 17001 - Note receivable,"$86,218.42 ","$86,218.42 ",$0.00 ,0.00%
+17003 - Security deposits,"$172,846.67 ","$190,133.31 ","($17,286.64)",-9.09%
+17005 - Interest on note receivable,$91.45 ,$91.45 ,$0.00 ,0.00%
+18000 - Operating lease right-of-use assets,"$249,490.04 ","$249,490.04 ",$0.00 ,0.00%
+Total Other Assets,"$614,386.45 ","$631,673.09 ","($17,286.64)",-2.74%
+Total ASSETS,"$29,028,557.80 ","$32,921,931.25 ","($3,893,373.45)",-11.83%
+Liabilities & Equity,,,,
+Current Liabilities,,,,
+Accounts Payable,,,,
+20001 - Accounts payable - trade,"$588,463.76 ","$546,400.81 ","$42,062.95 ",7.70%
+Total Accounts Payable,"$588,463.76 ","$546,400.81 ","$42,062.95 ",7.70%
+Credit Card,,,,
+20012 - Credit card - Ramp,"$176,403.11 ","$240,968.60 ","($64,565.49)",-26.79%
+Total Credit Card,"$176,403.11 ","$240,968.60 ","($64,565.49)",-26.79%
+Other Current Liability,,,,
+20003 - Payroll taxes payable,"($20,097.05)","($20,640.00)",$542.95 ,-2.63%
+20004 - Employee and Employer contributions payable,"$167,426.76 ","($6,336.15)","$173,762.91 ","-2,742.41%"
+20005 - Accrued expenses,"$162,421.63 ",$0.00 ,"$162,421.63 ",0.00%
+20006 - Benefits payable,"($132,109.72)","($16,344.32)","($115,765.40)",708.29%
+20007 - Wages payable,"$886,313.04 ","$656,048.36 ","$230,264.68 ",35.10%
+20010 - Accrued employee & employer contributions,"($53,762.38)",$0.00 ,"($53,762.38)",0.00%
+21000 - Deferred revenue,"$2,343,160.23 ","$2,111,549.64 ","$231,610.59 ",10.97%
+21001 - Other Payables,"$117,016.63 ","$117,016.63 ",$0.00 ,0.00%
+"26000 - Operating lease liabilities, current","$196,235.99 ","$196,235.99 ",$0.00 ,0.00%
+Total Other Current Liability,"$3,666,605.13 ","$3,037,530.15 ","$629,074.98 ",20.71%
+Total Current Liabilities,"$4,431,472.00 ","$3,824,899.56 ","$606,572.44 ",15.86%
+Long Term Liabilities,,,,
+"26100 - Operating lease liabilities, non-current","$57,208.63 ","$57,208.63 ",$0.00 ,0.00%
+Total Long Term Liabilities,"$57,208.63 ","$57,208.63 ",$0.00 ,0.00%
+Equity,,,,
+Equity,,,,
+30001 - Additional paid-in capital,"$82,188,473.19 ","$81,967,437.22 ","$221,035.97 ",0.27%
+30004 - Series seed preferred stock,"$11,286.46 ","$11,286.46 ",$0.00 ,0.00%
+30005 - Series A preferred stock,"$8,995.30 ","$8,995.30 ",$0.00 ,0.00%
+30006 - Series B preferred stock,"$7,140.15 ","$7,140.15 ",$0.00 ,0.00%
+30007 - Common stock,"$7,604.01 ","$7,604.01 ",$0.00 ,0.00%
+30008 - Series B-2 preferred stock,"$10,293.82 ","$10,293.82 ",$0.00 ,0.00%
+3200 - Z_Opening Balance,"$46,912.75 ",$0.00 ,"$46,912.75 ",0.00%
+Total - Equity,"$82,280,705.68 ","$82,012,756.96 ","$267,948.72 ",0.33%
+Retained Earnings,"($47,090,768.20)","($47,090,768.20)",$0.00 ,0.00%
+Net Income,"($10,650,060.31)","($5,882,165.70)","($4,767,894.61)",81.06%
+Total Equity,"$24,539,877.17 ","$29,039,823.06 ","($4,499,945.89)",-15.50%
+Total Liabilities & Equity,"$29,028,557.80 ","$32,921,931.25 ","($3,893,373.45)",-11.83%
