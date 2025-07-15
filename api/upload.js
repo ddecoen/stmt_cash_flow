@@ -123,9 +123,16 @@ function generateCashFlowStatement(records) {
     let beginningCash = 0;
     
     for (const record of records) {
-        // Extract net income from the variance
+        // Extract net income - use current amount for first quarter, variance for subsequent periods
         if (record.account && record.account.toLowerCase().includes('net income')) {
-            netIncome = parseAmount(record.variance) || 0;
+            // For first quarter (when prior amount is 0 or minimal), use current amount
+            // For subsequent quarters, use variance
+            const priorAmount = parseAmount(record.priorAmount) || 0;
+            if (Math.abs(priorAmount) < 1000) { // First quarter indicator
+                netIncome = parseAmount(record.currentAmount) || 0;
+            } else {
+                netIncome = parseAmount(record.variance) || 0;
+            }
         }
         
         // Extract beginning cash from Total Bank - Comparison Amount column
