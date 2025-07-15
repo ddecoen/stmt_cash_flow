@@ -125,13 +125,16 @@ function generateCashFlowStatement(records) {
     for (const record of records) {
         // Extract net income - use current amount for first quarter, variance for subsequent periods
         if (record.account && record.account.toLowerCase().includes('net income')) {
-            // For first quarter (when prior amount is 0 or minimal), use current amount
-            // For subsequent quarters, use variance
+            const currentAmount = parseAmount(record.currentAmount) || 0;
             const priorAmount = parseAmount(record.priorAmount) || 0;
-            if (Math.abs(priorAmount) < 1000) { // First quarter indicator
-                netIncome = parseAmount(record.currentAmount) || 0;
+            const variance = parseAmount(record.variance) || 0;
+            
+            // For first quarter (prior amount is 0), use current amount
+            // For subsequent quarters, use variance
+            if (priorAmount === 0) {
+                netIncome = currentAmount;
             } else {
-                netIncome = parseAmount(record.variance) || 0;
+                netIncome = variance;
             }
         }
         
