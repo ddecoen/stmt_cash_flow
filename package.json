@@ -5,7 +5,7 @@
   "main": "api/index.js",
   "scripts": {
     "dev": "vercel dev",
-    "build": "echo 'No build step required'"
+    "build": "mkdir -p public && echo 'Build complete' > public/build.txt"
   },
   "dependencies": {
     "csv-parser": "^3.0.0",
