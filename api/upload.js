@@ -131,6 +131,7 @@ function generateCashFlowStatement(records) {
         // Extract beginning cash from Total Bank - Comparison Amount column
         if (record.account && record.account.toLowerCase().includes('total bank')) {
             beginningCash = parseAmount(record.priorAmount) || 0;
+            console.log('Found Total Bank:', record.account, 'Prior Amount:', record.priorAmount, 'Parsed:', beginningCash);
         }
     }
     
@@ -369,11 +370,7 @@ async function createExcelFile(cashFlow) {
             if (item.amount !== null) {
                 const numericAmount = Number(item.amount);
                 worksheet.getCell(`B${row}`).value = numericAmount;
-                worksheet.getCell(`B${row}`).numFmt = '#,##0';
-                if (numericAmount < 0) {
-                    worksheet.getCell(`B${row}`).value = Math.abs(numericAmount);
-                    worksheet.getCell(`B${row}`).numFmt = '(#,##0)';
-                }
+                worksheet.getCell(`B${row}`).numFmt = '#,##0_);(#,##0)';
             }
             
             // Apply styling based on item type
@@ -394,11 +391,7 @@ async function createExcelFile(cashFlow) {
         worksheet.getCell(`A${row}`).value = item.description;
         const numericAmount = Number(item.amount);
         worksheet.getCell(`B${row}`).value = numericAmount;
-        worksheet.getCell(`B${row}`).numFmt = '#,##0';
-        if (numericAmount < 0) {
-            worksheet.getCell(`B${row}`).value = Math.abs(numericAmount);
-            worksheet.getCell(`B${row}`).numFmt = '(#,##0)';
-        }
+        worksheet.getCell(`B${row}`).numFmt = '#,##0_);(#,##0)';
         
         if (item.isTotal) {
             worksheet.getCell(`A${row}`).font = { bold: true };
@@ -416,11 +409,7 @@ async function createExcelFile(cashFlow) {
         worksheet.getCell(`A${row}`).value = item.description;
         const numericAmount = Number(item.amount);
         worksheet.getCell(`B${row}`).value = numericAmount;
-        worksheet.getCell(`B${row}`).numFmt = '#,##0';
-        if (numericAmount < 0) {
-            worksheet.getCell(`B${row}`).value = Math.abs(numericAmount);
-            worksheet.getCell(`B${row}`).numFmt = '(#,##0)';
-        }
+        worksheet.getCell(`B${row}`).numFmt = '#,##0_);(#,##0)';
         
         if (item.isTotal) {
             worksheet.getCell(`A${row}`).font = { bold: true };
@@ -435,18 +424,14 @@ async function createExcelFile(cashFlow) {
     worksheet.getCell(`B${row}`).value = netCashChangeAmount;
     worksheet.getCell(`A${row}`).font = { bold: true };
     worksheet.getCell(`B${row}`).font = { bold: true };
-    worksheet.getCell(`B${row}`).numFmt = '#,##0';
-    if (netCashChangeAmount < 0) {
-        worksheet.getCell(`B${row}`).value = Math.abs(netCashChangeAmount);
-        worksheet.getCell(`B${row}`).numFmt = '(#,##0)';
-    }
+    worksheet.getCell(`B${row}`).numFmt = '#,##0_);(#,##0)';
     row++;
     
     // Beginning cash
     const beginningCashAmount = Number(cashFlow.beginningCash);
     worksheet.getCell(`A${row}`).value = 'Cash and cash equivalents at beginning of period';
     worksheet.getCell(`B${row}`).value = beginningCashAmount;
-    worksheet.getCell(`B${row}`).numFmt = '#,##0';
+    worksheet.getCell(`B${row}`).numFmt = '#,##0_);(#,##0)';
     row++;
     
     // Ending cash
@@ -455,7 +440,7 @@ async function createExcelFile(cashFlow) {
     worksheet.getCell(`B${row}`).value = endingCashAmount;
     worksheet.getCell(`A${row}`).font = { bold: true };
     worksheet.getCell(`B${row}`).font = { bold: true };
-    worksheet.getCell(`B${row}`).numFmt = '#,##0';
+    worksheet.getCell(`B${row}`).numFmt = '#,##0_);(#,##0)';
     
     return await workbook.xlsx.writeBuffer();
 }
@@ -488,9 +473,13 @@ export default async function handler(req, res) {
                         .pipe(csv({ headers: false }))
                         .on('data', (data) => {
                             const row = Object.values(data);
-                            if (row.length >= 4 && row[0] && !row[0].toLowerCase().includes('total')) {
+                            if (row.length >= 4 && row[0]) {
+                                // Include Total Bank for cash extraction, but exclude other totals for cash flow items
+                                const isTotal = row[0].toLowerCase().includes('total');
+                                const isTotalBank = row[0].toLowerCase().includes('total bank');
                                 const variance = parseAmount(row[3]);
-                                if (variance !== 0) {
+                                
+                                if (isTotalBank || (!isTotal && variance !== 0)) {
                                     records.push({
                                         account: row[0],
                                         currentAmount: parseAmount(row[1]),
