@@ -367,10 +367,12 @@ async function createExcelFile(cashFlow) {
             worksheet.getCell(`A${row}`).value = item.description;
             
             if (item.amount !== null) {
-                worksheet.getCell(`B${row}`).value = item.amount;
+                const numericAmount = Number(item.amount);
+                worksheet.getCell(`B${row}`).value = numericAmount;
                 worksheet.getCell(`B${row}`).numFmt = '#,##0';
-                if (item.amount < 0) {
-                    worksheet.getCell(`B${row}`).value = `(${Math.abs(item.amount).toLocaleString()})`;
+                if (numericAmount < 0) {
+                    worksheet.getCell(`B${row}`).value = Math.abs(numericAmount);
+                    worksheet.getCell(`B${row}`).numFmt = '(#,##0)';
                 }
             }
             
@@ -390,10 +392,12 @@ async function createExcelFile(cashFlow) {
     
     for (const item of cashFlow.investingActivities) {
         worksheet.getCell(`A${row}`).value = item.description;
-        worksheet.getCell(`B${row}`).value = item.amount;
+        const numericAmount = Number(item.amount);
+        worksheet.getCell(`B${row}`).value = numericAmount;
         worksheet.getCell(`B${row}`).numFmt = '#,##0';
-        if (item.amount < 0) {
-            worksheet.getCell(`B${row}`).value = `(${Math.abs(item.amount).toLocaleString()})`;
+        if (numericAmount < 0) {
+            worksheet.getCell(`B${row}`).value = Math.abs(numericAmount);
+            worksheet.getCell(`B${row}`).numFmt = '(#,##0)';
         }
         
         if (item.isTotal) {
@@ -410,10 +414,12 @@ async function createExcelFile(cashFlow) {
     
     for (const item of cashFlow.financingActivities) {
         worksheet.getCell(`A${row}`).value = item.description;
-        worksheet.getCell(`B${row}`).value = item.amount;
+        const numericAmount = Number(item.amount);
+        worksheet.getCell(`B${row}`).value = numericAmount;
         worksheet.getCell(`B${row}`).numFmt = '#,##0';
-        if (item.amount < 0) {
-            worksheet.getCell(`B${row}`).value = `(${Math.abs(item.amount).toLocaleString()})`;
+        if (numericAmount < 0) {
+            worksheet.getCell(`B${row}`).value = Math.abs(numericAmount);
+            worksheet.getCell(`B${row}`).numFmt = '(#,##0)';
         }
         
         if (item.isTotal) {
@@ -424,25 +430,29 @@ async function createExcelFile(cashFlow) {
     }
     
     // Net change in cash
-    worksheet.getCell(`A${row}`).value = cashFlow.netCashChange < 0 ? 'Net decrease in cash and cash equivalents' : 'Net increase in cash and cash equivalents';
-    worksheet.getCell(`B${row}`).value = cashFlow.netCashChange;
+    const netCashChangeAmount = Number(cashFlow.netCashChange);
+    worksheet.getCell(`A${row}`).value = netCashChangeAmount < 0 ? 'Net decrease in cash and cash equivalents' : 'Net increase in cash and cash equivalents';
+    worksheet.getCell(`B${row}`).value = netCashChangeAmount;
     worksheet.getCell(`A${row}`).font = { bold: true };
     worksheet.getCell(`B${row}`).font = { bold: true };
     worksheet.getCell(`B${row}`).numFmt = '#,##0';
-    if (cashFlow.netCashChange < 0) {
-        worksheet.getCell(`B${row}`).value = `(${Math.abs(cashFlow.netCashChange).toLocaleString()})`;
+    if (netCashChangeAmount < 0) {
+        worksheet.getCell(`B${row}`).value = Math.abs(netCashChangeAmount);
+        worksheet.getCell(`B${row}`).numFmt = '(#,##0)';
     }
     row++;
     
     // Beginning cash
+    const beginningCashAmount = Number(cashFlow.beginningCash);
     worksheet.getCell(`A${row}`).value = 'Cash and cash equivalents at beginning of period';
-    worksheet.getCell(`B${row}`).value = cashFlow.beginningCash;
+    worksheet.getCell(`B${row}`).value = beginningCashAmount;
     worksheet.getCell(`B${row}`).numFmt = '#,##0';
     row++;
     
     // Ending cash
+    const endingCashAmount = Number(cashFlow.endingCash);
     worksheet.getCell(`A${row}`).value = 'Cash and cash equivalents at end of period';
-    worksheet.getCell(`B${row}`).value = cashFlow.endingCash;
+    worksheet.getCell(`B${row}`).value = endingCashAmount;
     worksheet.getCell(`A${row}`).font = { bold: true };
     worksheet.getCell(`B${row}`).font = { bold: true };
     worksheet.getCell(`B${row}`).numFmt = '#,##0';
