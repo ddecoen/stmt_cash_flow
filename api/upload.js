@@ -118,12 +118,38 @@ function generateCashFlowStatement(records) {
         financing: {}
     };
     
-    // Find net income/loss and beginning cash
+    // Calculate net income from income statement data and find beginning cash
     let netIncome = 0;
     let beginningCash = 0;
+    let dividendIncome = 0;
+    let interestIncome = 0;
     
     for (const record of records) {
-        // Extract net income - use current amount for first quarter, variance for subsequent periods
+        // Calculate net income from income statement components
+        if (record.account && record.accountType) {
+            const amount = parseAmount(record.currentAmount) || parseAmount(record.variance) || 0;
+            const accountType = record.accountType.toLowerCase();
+            const accountName = record.account.toLowerCase();
+            
+            // Income items (positive contribution to net income)
+            if (accountType.includes('income') || accountName.includes('revenue') || accountName.includes('sales')) {
+                netIncome += amount;
+            }
+            // Expense items (negative contribution to net income)
+            else if (accountType.includes('expense') || accountType.includes('cost of goods sold')) {
+                netIncome += amount; // Amount is already negative in the data
+            }
+            
+            // Track dividend and interest income for adjustments
+            if (accountName.includes('dividend') && accountType.includes('income')) {
+                dividendIncome += amount;
+            }
+            if (accountName.includes('interest') && accountType.includes('income')) {
+                interestIncome += amount;
+            }
+        }
+        
+        // Extract net income from existing net income accounts if present
         if (record.account && record.account.toLowerCase().includes('net income')) {
             const currentAmount = parseAmount(record.currentAmount) || 0;
             const priorAmount = parseAmount(record.priorAmount) || 0;
@@ -203,6 +229,23 @@ function generateCashFlowStatement(records) {
         operatingActivities.push({ 
             description: 'Depreciation and amortization expense', 
             amount: lineItems.operating['Depreciation and amortization expense'], 
+            isAdjustment: true 
+        });
+    }
+    
+    // Add dividend and interest income adjustments (non-cash items to be deducted)
+    if (dividendIncome > 0) {
+        operatingActivities.push({ 
+            description: 'Dividend income received', 
+            amount: -dividendIncome, // Negative because it's a deduction from net income
+            isAdjustment: true 
+        });
+    }
+    
+    if (interestIncome > 0) {
+        operatingActivities.push({ 
+            description: 'Interest income received', 
+            amount: -interestIncome, // Negative because it's a deduction from net income
             isAdjustment: true 
         });
     }
