@@ -118,10 +118,9 @@ function generateCashFlowStatement(records) {
         financing: {}
     };
     
-    // Find net income/loss and cash balances
+    // Find net income/loss and beginning cash
     let netIncome = 0;
     let beginningCash = 0;
-    let endingCash = 0;
     
     for (const record of records) {
         // Extract net income from the variance
@@ -129,9 +128,8 @@ function generateCashFlowStatement(records) {
             netIncome = parseAmount(record.variance) || 0;
         }
         
-        // Extract cash balances - ending cash from current amount, beginning from prior amount
-        if (record.account && record.account.toLowerCase().includes('total - 11000 - cash and cash equivalents')) {
-            endingCash = parseAmount(record.currentAmount) || 0;
+        // Extract beginning cash from Total Bank - Comparison Amount column
+        if (record.account && record.account.toLowerCase().includes('total bank')) {
             beginningCash = parseAmount(record.priorAmount) || 0;
         }
     }
@@ -289,8 +287,8 @@ function generateCashFlowStatement(records) {
     // Calculate net change in cash
     const netCashChange = operatingTotal + investingTotal + financingTotal;
     
-    // Use actual cash balances extracted from the balance sheet
-    // endingCash and beginningCash are already set from the data extraction above
+    // Calculate ending cash as beginning cash + net cash change (formula)
+    const endingCash = beginningCash + netCashChange;
     
     return {
         operatingActivities: operatingActivities,
