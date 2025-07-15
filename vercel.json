@@ -1,24 +1,13 @@
 {
-  "version": 2,
-  "builds": [
-    {
-      "src": "*.go",
-      "use": "@vercel/go"
+  "functions": {
+    "api/index.go": {
+      "runtime": "go1.x"
     }
-  ],
+  },
   "routes": [
     {
-      "src": "/static/(.*)",
-      "dest": "/static/$1"
-    },
-    {
       "src": "/(.*)",
-      "dest": "/"
+      "dest": "/api/index.go"
     }
-  ],
-  "functions": {
-    "main.go": {
-      "maxDuration": 30
-    }
-  }
+  ]
 }
