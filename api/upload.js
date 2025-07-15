@@ -22,75 +22,77 @@ function parseAmount(amountStr) {
     return isNaN(parsed) ? 0 : parsed;
 }
 
-// Categorize account for cash flow with specific line items
+// Categorize account for cash flow with specific line items based on NetSuite account names
 function categorizeAccount(accountName, accountType) {
     const name = accountName.toLowerCase();
     const type = (accountType || '').toLowerCase();
     
     // Cash accounts
-    if (name.includes('cash') || name.includes('bank') || name.includes('money market')) {
+    if (name.includes('cash') || name.includes('bank') || name.includes('money market') || name.includes('jpm')) {
         return 'cash';
     }
     
-    // Operating activities - specific categorization
-    if (name.includes('receivable')) {
+    // Depreciation and amortization (from AD accounts)
+    if (name.includes('ad -') || name.includes('accumulated depreciation')) {
+        return { category: 'operating', lineItem: 'Depreciation and amortization expense' };
+    }
+    
+    // Operating activities - specific NetSuite account mapping
+    if (name.includes('accounts receivable') || name.includes('receivables')) {
         return { category: 'operating', lineItem: 'Accounts receivable' };
     }
-    if (name.includes('prepaid') || name.includes('other assets')) {
+    
+    // Prepaid expenses and unbilled (combined as per your specification)
+    if (name.includes('prepaid') || name.includes('unbilled')) {
         return { category: 'operating', lineItem: 'Prepaid expenses and other assets' };
     }
-    if (name.includes('payable')) {
+    
+    // Other assets (security deposits, etc.)
+    if (name.includes('security deposits') || name.includes('note receivable') || name.includes('interest on note')) {
+        return { category: 'operating', lineItem: 'Other assets' };
+    }
+    
+    // Accounts payable
+    if (name.includes('accounts payable') || name.includes('credit card')) {
         return { category: 'operating', lineItem: 'Accounts payable' };
     }
-    if (name.includes('accrued') && (name.includes('expense') || name.includes('liabilities'))) {
+    
+    // Accrued expenses and other liabilities (includes payroll, wages, benefits, etc.)
+    if (name.includes('payroll') || name.includes('wages') || name.includes('benefits') || 
+        name.includes('accrued') || name.includes('employee') || name.includes('contributions') ||
+        name.includes('other payables') || name.includes('operating lease liabilities')) {
         return { category: 'operating', lineItem: 'Accrued expenses and other liabilities' };
     }
-    if (name.includes('accrued') && name.includes('compensation')) {
-        return { category: 'operating', lineItem: 'Accrued compensation and benefits' };
-    }
-    if (name.includes('deferred') && name.includes('revenue')) {
+    
+    // Deferred revenue
+    if (name.includes('deferred revenue')) {
         return { category: 'operating', lineItem: 'Deferred revenue' };
     }
-    if (name.includes('customer') && name.includes('deposit')) {
-        return { category: 'operating', lineItem: 'Customer deposits' };
-    }
-    if (name.includes('deferred') && name.includes('contract')) {
-        return { category: 'operating', lineItem: 'Deferred contract acquisition costs' };
-    }
     
-    // Investing activities
-    if (name.includes('equipment') || name.includes('furniture') || name.includes('computer') ||
-        name.includes('property')) {
+    // Investing activities - Property and Equipment
+    if (name.includes('furniture') || name.includes('computer equipment') || name.includes('equipment')) {
         return { category: 'investing', lineItem: 'Purchases of property and equipment' };
     }
-    if (name.includes('capitalized') && name.includes('software')) {
-        return { category: 'investing', lineItem: 'Capitalized internal-use software' };
-    }
-    if (name.includes('business') && name.includes('combination')) {
-        return { category: 'investing', lineItem: 'Business combination, net of cash acquired' };
-    }
-    if (name.includes('short-term') && name.includes('investment')) {
-        if (name.includes('purchase')) {
-            return { category: 'investing', lineItem: 'Purchases of short-term investments' };
-        }
-        if (name.includes('proceeds') || name.includes('sale')) {
-            return { category: 'investing', lineItem: 'Proceeds from sales of short-term investments' };
-        }
-        if (name.includes('maturities')) {
-            return { category: 'investing', lineItem: 'Proceeds from maturities of short-term investments' };
-        }
+    
+    // Financing activities - Stock issuances (Additional paid-in capital)
+    if (name.includes('additional paid-in capital')) {
+        return { category: 'financing', lineItem: 'Proceeds from stock issuance' };
     }
     
-    // Financing activities
-    if (name.includes('taxes') && name.includes('equity')) {
-        return { category: 'financing', lineItem: 'Taxes paid related to net share settlement of equity awards' };
-    }
-    if (name.includes('acquisition') && name.includes('holdback')) {
-        return { category: 'financing', lineItem: 'Payments related to acquisition holdback' };
+    // Other equity transactions (Opening Balance, etc.)
+    if (name.includes('opening balance') || name.includes('z_opening')) {
+        return { category: 'financing', lineItem: 'Other equity transactions' };
     }
     
-    // Default to operating with generic description
-    return { category: 'operating', lineItem: 'Other' };
+    // Skip these accounts for cash flow purposes
+    if (name.includes('retained earnings') || name.includes('net income') || name.includes('total') ||
+        name.includes('preferred stock') || name.includes('common stock') || 
+        name.includes('capitalized software') || name.includes('domain') || name.includes('leasehold')) {
+        return 'skip';
+    }
+    
+    // Default to skip if not specifically categorized
+    return 'skip';
 }
 
 // Adjust amount for cash flow impact
@@ -118,28 +120,26 @@ function generateCashFlowStatement(records) {
     let endingCash = 0;
     
     for (const record of records) {
-        if (record.account && (record.account.toLowerCase().includes('net income') || 
-                              record.account.toLowerCase().includes('net loss'))) {
-            netIncome = record.variance || 0;
+        // Extract net income from the variance
+        if (record.account && record.account.toLowerCase().includes('net income')) {
+            netIncome = parseAmount(record.variance) || 0;
         }
-        // Extract cash balances from balance sheet data
-        if (record.account && record.account.toLowerCase().includes('cash')) {
-            // This would need to be enhanced based on actual data structure
-            // For now, we'll use template values
+        
+        // Extract cash balances - ending cash from current amount, beginning from comparison
+        if (record.account && record.account.toLowerCase().includes('total - 11000 - cash and cash equivalents')) {
+            endingCash = parseAmount(record.amount) || 0;
+            beginningCash = parseAmount(record.comparisonAmount) || 0;
         }
     }
     
     // Process other accounts
     for (const record of records) {
-        if (!record.variance || record.variance === 0) continue;
-        if (record.account.toLowerCase().includes('total')) continue;
-        if (record.account.toLowerCase().includes('net income') || 
-            record.account.toLowerCase().includes('net loss')) continue;
+        if (!record.variance || parseAmount(record.variance) === 0) continue;
         
         const categorization = categorizeAccount(record.account, record.accountType);
-        if (categorization === 'cash') continue; // Skip cash items for now
+        if (categorization === 'cash' || categorization === 'skip') continue;
         
-        const adjustedAmount = adjustAmountForCashFlow(record.variance, record.accountType);
+        const variance = parseAmount(record.variance);
         
         if (typeof categorization === 'object') {
             const { category, lineItem } = categorization;
@@ -147,6 +147,23 @@ function generateCashFlowStatement(records) {
             if (!lineItems[category][lineItem]) {
                 lineItems[category][lineItem] = 0;
             }
+            
+            // For balance sheet items, the variance represents the change
+            // For assets: increase = use of cash (negative), decrease = source of cash (positive)
+            // For liabilities/equity: increase = source of cash (positive), decrease = use of cash (negative)
+            let adjustedAmount = variance;
+            
+            // Reverse sign for asset accounts (AR, prepaid, etc.)
+            if (lineItem === 'Accounts receivable' || lineItem === 'Prepaid expenses and other assets' || 
+                lineItem === 'Other assets' || lineItem === 'Purchases of property and equipment') {
+                adjustedAmount = -variance;
+            }
+            
+            // For depreciation, we want the absolute increase in accumulated depreciation
+            if (lineItem === 'Depreciation and amortization expense') {
+                adjustedAmount = Math.abs(variance);
+            }
+            
             lineItems[category][lineItem] += adjustedAmount;
         }
     }
@@ -168,12 +185,14 @@ function generateCashFlowStatement(records) {
         isHeader: true 
     });
     
-    // Add specific adjustment items
-    operatingActivities.push({ 
-        description: 'Depreciation and amortization expense', 
-        amount: 21000, // This would be calculated from actual data
-        isAdjustment: true 
-    });
+    // Add depreciation and amortization from actual data
+    if (lineItems.operating['Depreciation and amortization expense']) {
+        operatingActivities.push({ 
+            description: 'Depreciation and amortization expense', 
+            amount: lineItems.operating['Depreciation and amortization expense'], 
+            isAdjustment: true 
+        });
+    }
     
     // Add working capital changes header
     operatingActivities.push({ 
@@ -182,23 +201,24 @@ function generateCashFlowStatement(records) {
         isHeader: true 
     });
     
-    // Add specific line items with actual data or template values
-    const operatingLineItems = [
-        { name: 'Accounts receivable', templateAmount: -626000 },
-        { name: 'Prepaid expenses and other assets', templateAmount: -224000 },
-        { name: 'Accounts payable', templateAmount: 42000 },
-        { name: 'Accrued expenses and other liabilities', templateAmount: 451000 },
-        { name: 'Deferred revenue', templateAmount: 232000 }
+    // Add line items from actual extracted data
+    const operatingLineItemOrder = [
+        'Accounts receivable',
+        'Prepaid expenses and other assets', 
+        'Other assets',
+        'Accounts payable',
+        'Accrued expenses and other liabilities',
+        'Deferred revenue'
     ];
     
-    operatingLineItems.forEach(({ name, templateAmount }) => {
-        const actualAmount = lineItems.operating[name] ? 
-            lineItems.operating[name] : templateAmount;
-        operatingActivities.push({ 
-            description: name, 
-            amount: actualAmount, 
-            isWorkingCapital: true 
-        });
+    operatingLineItemOrder.forEach(lineItem => {
+        if (lineItems.operating[lineItem] && lineItems.operating[lineItem] !== 0) {
+            operatingActivities.push({ 
+                description: lineItem, 
+                amount: lineItems.operating[lineItem], 
+                isWorkingCapital: true 
+            });
+        }
     });
     
     // Calculate operating total
@@ -215,41 +235,58 @@ function generateCashFlowStatement(records) {
     // Build investing activities
     const investingActivities = [];
     
-    investingActivities.push({ 
-        description: 'Purchases of property and equipment', 
-        amount: -40000, // This would be calculated from actual data
-        isMainItem: true 
-    });
+    // Add investing items from actual extracted data
+    if (lineItems.investing['Purchases of property and equipment'] && lineItems.investing['Purchases of property and equipment'] !== 0) {
+        investingActivities.push({ 
+            description: 'Purchases of property and equipment', 
+            amount: lineItems.investing['Purchases of property and equipment'], 
+            isMainItem: true 
+        });
+    }
     
     const investingTotal = investingActivities.reduce((sum, item) => sum + item.amount, 0);
-    investingActivities.push({ 
-        description: investingTotal < 0 ? 'Net cash used in investing activities' : 'Net cash provided by investing activities', 
-        amount: investingTotal, 
-        isTotal: true 
-    });
+    if (investingActivities.length > 0) {
+        investingActivities.push({ 
+            description: investingTotal < 0 ? 'Net cash used in investing activities' : 'Net cash provided by investing activities', 
+            amount: investingTotal, 
+            isTotal: true 
+        });
+    }
     
     // Build financing activities
     const financingActivities = [];
     
-    financingActivities.push({ 
-        description: 'Proceeds from stock issuance', 
-        amount: 221000, // This would be calculated from actual data
-        isMainItem: true 
-    });
+    // Add financing items from actual extracted data
+    if (lineItems.financing['Proceeds from stock issuance'] && lineItems.financing['Proceeds from stock issuance'] !== 0) {
+        financingActivities.push({ 
+            description: 'Proceeds from stock issuance', 
+            amount: lineItems.financing['Proceeds from stock issuance'], 
+            isMainItem: true 
+        });
+    }
+    
+    if (lineItems.financing['Other equity transactions'] && lineItems.financing['Other equity transactions'] !== 0) {
+        financingActivities.push({ 
+            description: 'Other equity transactions', 
+            amount: lineItems.financing['Other equity transactions'], 
+            isMainItem: true 
+        });
+    }
     
     const financingTotal = financingActivities.reduce((sum, item) => sum + item.amount, 0);
-    financingActivities.push({ 
-        description: financingTotal < 0 ? 'Net cash used in financing activities' : 'Net cash provided by financing activities', 
-        amount: financingTotal, 
-        isTotal: true 
-    });
+    if (financingActivities.length > 0) {
+        financingActivities.push({ 
+            description: financingTotal < 0 ? 'Net cash used in financing activities' : 'Net cash provided by financing activities', 
+            amount: financingTotal, 
+            isTotal: true 
+        });
+    }
     
     // Calculate net change in cash
     const netCashChange = operatingTotal + investingTotal + financingTotal;
     
-    // Calculate cash balances (these would come from actual balance sheet data)
-    beginningCash = 28226000; // This should be extracted from the balance sheet
-    endingCash = beginningCash + netCashChange;
+    // Use actual cash balances extracted from the balance sheet
+    // endingCash and beginningCash are already set from the data extraction above
     
     return {
         operatingActivities: operatingActivities,
