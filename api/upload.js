@@ -41,14 +41,14 @@ function categorizeAccount(accountName, accountType) {
         return { category: 'operating', lineItem: 'Depreciation and amortization expense' };
     }
     
-    // Operating activities - specific NetSuite account mapping
-    if (name.includes('accounts receivable') || name.includes('receivables')) {
-        return { category: 'operating', lineItem: 'Accounts receivable' };
-    }
-    
-    // Prepaid expenses and unbilled (combined as per your specification)
+    // Prepaid expenses and unbilled (check unbilled first before accounts receivable)
     if (name.includes('prepaid') || name.includes('unbilled')) {
         return { category: 'operating', lineItem: 'Prepaid expenses and other assets' };
+    }
+    
+    // Operating activities - specific NetSuite account mapping (after unbilled check)
+    if (name.includes('accounts receivable') || name.includes('receivables')) {
+        return { category: 'operating', lineItem: 'Accounts receivable' };
     }
     
     // Other assets (security deposits, etc.)
