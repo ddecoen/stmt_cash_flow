@@ -569,10 +569,14 @@ export default async function handler(req, res) {
                 console.log('Generated CSV content length:', csvContent.length);
                 console.log('CSV content preview:', csvContent.substring(0, 200));
                 
-                // Send CSV file with explicit headers
+                // Send CSV file with explicit headers and timestamp to avoid caching
+                const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+                const filename = `cash_flow_statement_${timestamp}.csv`;
                 res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-                res.setHeader('Content-Disposition', 'attachment; filename=cash_flow_statement.csv');
-                res.setHeader('Cache-Control', 'no-cache');
+                res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
+                res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+                res.setHeader('Pragma', 'no-cache');
+                res.setHeader('Expires', '0');
                 res.send(csvContent);
                 
                 // Clean up temporary files
