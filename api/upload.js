@@ -4,6 +4,13 @@ const { IncomingForm } = require('formidable');
 const { Readable } = require('stream');
 const fs = require('fs');
 
+// API configuration for formidable
+export const config = {
+    api: {
+        bodyParser: false,
+    },
+};
+
 // Parse amount from string
 function parseAmount(amountStr) {
     if (!amountStr) return 0;
