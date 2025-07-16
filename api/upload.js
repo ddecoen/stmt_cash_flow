@@ -90,48 +90,77 @@ function parseIncomeStatementData(records) {
 // Parse CSV file buffer into records
 function parseCSVFile(fileBuffer, fileType) {
     return new Promise((resolve, reject) => {
-        const records = [];
-        const csvStream = Readable.from(fileBuffer.toString());
-        
-        csvStream
-            .pipe(csv({ headers: false }))
-            .on('data', (data) => {
-                const row = Object.values(data);
-                
-                if (fileType === 'balanceSheet') {
-                    // Balance sheet parsing logic
-                    if (row.length >= 4 && row[0]) {
-                        const isTotal = row[0].toLowerCase().includes('total');
-                        const isTotalBank = row[0].toLowerCase().includes('total bank');
-                        const variance = parseAmount(row[3]);
+        try {
+            if (!fileBuffer || fileBuffer.length === 0) {
+                throw new Error(`Empty file buffer for ${fileType}`);
+            }
+            
+            const records = [];
+            const csvContent = fileBuffer.toString('utf8');
+            
+            if (!csvContent || csvContent.trim().length === 0) {
+                throw new Error(`Empty CSV content for ${fileType}`);
+            }
+            
+            console.log(`Parsing ${fileType} - Content preview:`, csvContent.substring(0, 200));
+            
+            const csvStream = Readable.from(csvContent);
+            
+            csvStream
+                .pipe(csv({ headers: false }))
+                .on('data', (data) => {
+                    try {
+                        const row = Object.values(data);
                         
-                        if (isTotalBank || (!isTotal && variance !== 0)) {
-                            records.push({
-                                account: row[0],
-                                currentAmount: parseAmount(row[1]),
-                                priorAmount: parseAmount(row[2]),
-                                variance: variance,
-                                accountType: 'Balance Sheet'
-                            });
+                        if (fileType === 'balanceSheet') {
+                            // Balance sheet parsing logic
+                            if (row.length >= 4 && row[0]) {
+                                const isTotal = row[0].toLowerCase().includes('total');
+                                const isTotalBank = row[0].toLowerCase().includes('total bank');
+                                const variance = parseAmount(row[3]);
+                                
+                                if (isTotalBank || (!isTotal && variance !== 0)) {
+                                    records.push({
+                                        account: row[0],
+                                        currentAmount: parseAmount(row[1]),
+                                        priorAmount: parseAmount(row[2]),
+                                        variance: variance,
+                                        accountType: 'Balance Sheet'
+                                    });
+                                }
+                            }
+                        } else if (fileType === 'incomeStatement') {
+                            // Income statement parsing logic
+                            if (row.length >= 2 && row[0]) {
+                                const record = {};
+                                const keys = Object.keys(data);
+                                if (keys.length >= 2) {
+                                    record[keys[0]] = row[0];
+                                    record[keys[1]] = row[1];
+                                    records.push(record);
+                                }
+                            }
                         }
+                    } catch (rowError) {
+                        console.warn(`Error parsing row in ${fileType}:`, rowError.message);
+                        // Continue processing other rows
                     }
-                } else if (fileType === 'incomeStatement') {
-                    // Income statement parsing logic
-                    if (row.length >= 2 && row[0]) {
-                        const record = {};
-                        const keys = Object.keys(data);
-                        record[keys[0]] = row[0];
-                        record[keys[1]] = row[1];
-                        records.push(record);
+                })
+                .on('end', () => {
+                    console.log(`${fileType} parsing completed. Records found:`, records.length);
+                    if (records.length === 0) {
+                        console.warn(`No records found in ${fileType}`);
                     }
-                }
-            })
-            .on('end', () => {
-                resolve(records);
-            })
-            .on('error', (error) => {
-                reject(error);
-            });
+                    resolve(records);
+                })
+                .on('error', (error) => {
+                    console.error(`CSV parsing error for ${fileType}:`, error);
+                    reject(new Error(`CSV parsing failed for ${fileType}: ${error.message}`));
+                });
+        } catch (error) {
+            console.error(`parseCSVFile error for ${fileType}:`, error);
+            reject(error);
+        }
     });
 }
 
@@ -670,18 +699,43 @@ export default async function handler(req, res) {
             }
             
             try {
+                console.log('Starting file processing...');
+                
                 // Parse both CSV files
                 const balanceSheetFile = req.files.balanceSheetFile[0];
                 const incomeStatementFile = req.files.incomeStatementFile[0];
                 
+                console.log('Files received:', {
+                    balanceSheet: {
+                        filename: balanceSheetFile.originalname,
+                        size: balanceSheetFile.size,
+                        mimetype: balanceSheetFile.mimetype
+                    },
+                    incomeStatement: {
+                        filename: incomeStatementFile.originalname,
+                        size: incomeStatementFile.size,
+                        mimetype: incomeStatementFile.mimetype
+                    }
+                });
+                
+                console.log('Parsing CSV files...');
                 const [balanceSheetRecords, incomeStatementRecords] = await Promise.all([
-                    parseCSVFile(balanceSheetFile.buffer, 'balanceSheet'),
-                    parseCSVFile(incomeStatementFile.buffer, 'incomeStatement')
+                    parseCSVFile(balanceSheetFile.buffer, 'balanceSheet').catch(err => {
+                        console.error('Balance sheet parsing error:', err);
+                        throw new Error(`Balance sheet parsing failed: ${err.message}`);
+                    }),
+                    parseCSVFile(incomeStatementFile.buffer, 'incomeStatement').catch(err => {
+                        console.error('Income statement parsing error:', err);
+                        throw new Error(`Income statement parsing failed: ${err.message}`);
+                    })
                 ]);
                 
-                console.log('Balance Sheet Records:', balanceSheetRecords.length);
-                console.log('Income Statement Records:', incomeStatementRecords.length);
+                console.log('Parsing completed:', {
+                    balanceSheetRecords: balanceSheetRecords.length,
+                    incomeStatementRecords: incomeStatementRecords.length
+                });
                 
+                console.log('Generating cash flow statement...');
                 // Generate cash flow statement using both datasets
                 const cashFlow = generateCashFlowStatementFromBothFiles(balanceSheetRecords, incomeStatementRecords);
                 
@@ -694,8 +748,21 @@ export default async function handler(req, res) {
                 res.send(excelBuffer);
                 
             } catch (error) {
-                console.error('Error processing file:', error);
-                res.status(500).send('Error processing file: ' + error.message);
+                console.error('Error processing files:', {
+                    message: error.message,
+                    stack: error.stack,
+                    name: error.name
+                });
+                
+                // Send detailed error response
+                const errorMessage = `Error processing files: ${error.message}`;
+                console.error('Sending error response:', errorMessage);
+                
+                res.status(500).json({
+                    error: 'Processing failed',
+                    message: errorMessage,
+                    details: error.name
+                });
             }
             
             resolve();
