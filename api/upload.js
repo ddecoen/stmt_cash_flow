@@ -1,10 +1,8 @@
 const csv = require('csv-parser');
 const ExcelJS = require('exceljs');
-const multer = require('multer');
+const { IncomingForm } = require('formidable');
 const { Readable } = require('stream');
-
-// Configure multer for memory storage
-const upload = multer({ storage: multer.memoryStorage() });
+const fs = require('fs');
 
 // Parse amount from string
 function parseAmount(amountStr) {
@@ -687,44 +685,54 @@ export default async function handler(req, res) {
     }
     
     return new Promise((resolve) => {
-        upload.fields([{ name: 'balanceSheetFile', maxCount: 1 }, { name: 'incomeStatementFile', maxCount: 1 }])(req, res, async (err) => {
+        const form = new IncomingForm();
+        
+        form.parse(req, async (err, fields, files) => {
             if (err) {
-                res.status(400).send('Error uploading files');
+                console.error('Formidable error:', err);
+                res.status(400).json({ error: 'Error uploading files', details: err.message });
                 return resolve();
             }
             
-            if (!req.files || !req.files.balanceSheetFile || !req.files.incomeStatementFile) {
-                res.status(400).send('Both balance sheet and income statement files are required');
+            console.log('Files received:', Object.keys(files));
+            
+            if (!files.balanceSheetFile || !files.incomeStatementFile) {
+                res.status(400).json({ error: 'Both balance sheet and income statement files are required' });
                 return resolve();
             }
             
             try {
                 console.log('Starting file processing...');
                 
-                // Parse both CSV files
-                const balanceSheetFile = req.files.balanceSheetFile[0];
-                const incomeStatementFile = req.files.incomeStatementFile[0];
+                // Parse both CSV files - formidable returns arrays, so get first element
+                const balanceSheetFile = Array.isArray(files.balanceSheetFile) ? files.balanceSheetFile[0] : files.balanceSheetFile;
+                const incomeStatementFile = Array.isArray(files.incomeStatementFile) ? files.incomeStatementFile[0] : files.incomeStatementFile;
                 
                 console.log('Files received:', {
                     balanceSheet: {
-                        filename: balanceSheetFile.originalname,
+                        filename: balanceSheetFile.originalFilename,
                         size: balanceSheetFile.size,
                         mimetype: balanceSheetFile.mimetype
                     },
                     incomeStatement: {
-                        filename: incomeStatementFile.originalname,
+                        filename: incomeStatementFile.originalFilename,
                         size: incomeStatementFile.size,
                         mimetype: incomeStatementFile.mimetype
                     }
                 });
                 
+                console.log('Reading file contents...');
+                // Read file contents from disk (formidable saves to temp files)
+                const balanceSheetBuffer = fs.readFileSync(balanceSheetFile.filepath);
+                const incomeStatementBuffer = fs.readFileSync(incomeStatementFile.filepath);
+                
                 console.log('Parsing CSV files...');
                 const [balanceSheetRecords, incomeStatementRecords] = await Promise.all([
-                    parseCSVFile(balanceSheetFile.buffer, 'balanceSheet').catch(err => {
+                    parseCSVFile(balanceSheetBuffer, 'balanceSheet').catch(err => {
                         console.error('Balance sheet parsing error:', err);
                         throw new Error(`Balance sheet parsing failed: ${err.message}`);
                     }),
-                    parseCSVFile(incomeStatementFile.buffer, 'incomeStatement').catch(err => {
+                    parseCSVFile(incomeStatementBuffer, 'incomeStatement').catch(err => {
                         console.error('Income statement parsing error:', err);
                         throw new Error(`Income statement parsing failed: ${err.message}`);
                     })
@@ -746,6 +754,14 @@ export default async function handler(req, res) {
                 res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
                 res.setHeader('Content-Disposition', 'attachment; filename="cash_flow_statement.xlsx"');
                 res.send(excelBuffer);
+                
+                // Clean up temporary files
+                try {
+                    fs.unlinkSync(balanceSheetFile.filepath);
+                    fs.unlinkSync(incomeStatementFile.filepath);
+                } catch (cleanupError) {
+                    console.warn('File cleanup error:', cleanupError.message);
+                }
                 
             } catch (error) {
                 console.error('Error processing files:', {
