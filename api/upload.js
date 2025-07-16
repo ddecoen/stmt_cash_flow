@@ -401,7 +401,6 @@ function generateCashFlowStatement(records, incomeData = null) {
     operatingActivities.push({ 
         description: netIncome < 0 ? 'Net loss' : 'Net income', 
         amount: netIncome, 
-        source: 'Income Statement',
         isMainItem: true 
     });
     
@@ -409,7 +408,6 @@ function generateCashFlowStatement(records, incomeData = null) {
     operatingActivities.push({ 
         description: 'Adjustments to reconcile net loss to cash from operating activities:', 
         amount: null, 
-        source: '',
         isHeader: true 
     });
     
@@ -418,7 +416,6 @@ function generateCashFlowStatement(records, incomeData = null) {
         operatingActivities.push({ 
             description: 'Depreciation and amortization expense', 
             amount: lineItems.operating['Depreciation and amortization expense'], 
-            source: 'Income Statement',
             isAdjustment: true 
         });
     }
@@ -428,7 +425,6 @@ function generateCashFlowStatement(records, incomeData = null) {
         operatingActivities.push({ 
             description: 'Dividend income received', 
             amount: -dividendIncome, // Negative because it's a deduction from net income
-            source: '',
             isAdjustment: true 
         });
     }
@@ -437,7 +433,6 @@ function generateCashFlowStatement(records, incomeData = null) {
         operatingActivities.push({ 
             description: 'Interest income received', 
             amount: -interestIncome, // Negative because it's a deduction from net income
-            source: '',
             isAdjustment: true 
         });
     }
@@ -446,7 +441,6 @@ function generateCashFlowStatement(records, incomeData = null) {
     operatingActivities.push({ 
         description: 'Changes in operating assets and liabilities:', 
         amount: null, 
-        source: '',
         isHeader: true 
     });
     
@@ -465,7 +459,6 @@ function generateCashFlowStatement(records, incomeData = null) {
             operatingActivities.push({ 
                 description: lineItem, 
                 amount: lineItems.operating[lineItem], 
-                source: 'Quarterly Balance Sheet',
                 isWorkingCapital: true 
             });
         }
@@ -479,7 +472,6 @@ function generateCashFlowStatement(records, incomeData = null) {
     operatingActivities.push({ 
         description: operatingTotal < 0 ? 'Net cash used in operating activities' : 'Net cash provided by operating activities', 
         amount: operatingTotal, 
-        source: 'Formula',
         isTotal: true 
     });
     
@@ -491,7 +483,6 @@ function generateCashFlowStatement(records, incomeData = null) {
         investingActivities.push({ 
             description: 'Purchases of property and equipment', 
             amount: lineItems.investing['Purchases of property and equipment'], 
-            source: 'Quarterly Balance Sheet',
             isMainItem: true 
         });
     }
@@ -501,7 +492,6 @@ function generateCashFlowStatement(records, incomeData = null) {
         investingActivities.push({ 
             description: investingTotal < 0 ? 'Net cash used in investing activities' : 'Net cash provided by investing activities', 
             amount: investingTotal, 
-            source: 'Formula',
             isTotal: true 
         });
     }
@@ -514,7 +504,6 @@ function generateCashFlowStatement(records, incomeData = null) {
         financingActivities.push({ 
             description: 'Proceeds from stock issuance', 
             amount: lineItems.financing['Proceeds from stock issuance'], 
-            source: 'Quarterly Balance Sheet',
             isMainItem: true 
         });
     }
@@ -523,7 +512,6 @@ function generateCashFlowStatement(records, incomeData = null) {
         financingActivities.push({ 
             description: 'Other equity transactions', 
             amount: lineItems.financing['Other equity transactions'], 
-            source: 'Quarterly Balance Sheet',
             isMainItem: true 
         });
     }
@@ -533,7 +521,6 @@ function generateCashFlowStatement(records, incomeData = null) {
         financingActivities.push({ 
             description: financingTotal < 0 ? 'Net cash used in financing activities' : 'Net cash provided by financing activities', 
             amount: financingTotal, 
-            source: 'Formula',
             isTotal: true 
         });
     }
@@ -564,7 +551,6 @@ async function createExcelFile(cashFlow) {
     // Set column widths
     worksheet.getColumn(1).width = 50;
     worksheet.getColumn(2).width = 20;
-    worksheet.getColumn(3).width = 25;
     
     let row = 1;
     
@@ -572,42 +558,40 @@ async function createExcelFile(cashFlow) {
     worksheet.getCell(`A${row}`).value = cashFlow.companyName;
     worksheet.getCell(`A${row}`).font = { bold: true, size: 14 };
     worksheet.getCell(`A${row}`).alignment = { horizontal: 'center' };
-    worksheet.mergeCells(`A${row}:C${row}`);
+    worksheet.mergeCells(`A${row}:B${row}`);
     row++;
     
     // Title
     worksheet.getCell(`A${row}`).value = 'CONDENSED CONSOLIDATED STATEMENTS OF CASH FLOWS';
     worksheet.getCell(`A${row}`).font = { bold: true, size: 12 };
     worksheet.getCell(`A${row}`).alignment = { horizontal: 'center' };
-    worksheet.mergeCells(`A${row}:C${row}`);
+    worksheet.mergeCells(`A${row}:B${row}`);
     row++;
     
     // Subtitle 1
     worksheet.getCell(`A${row}`).value = '(amounts in thousands)';
     worksheet.getCell(`A${row}`).alignment = { horizontal: 'center' };
-    worksheet.mergeCells(`A${row}:C${row}`);
+    worksheet.mergeCells(`A${row}:B${row}`);
     row++;
     
     // Subtitle 2
     worksheet.getCell(`A${row}`).value = '(unaudited)';
     worksheet.getCell(`A${row}`).alignment = { horizontal: 'center' };
-    worksheet.mergeCells(`A${row}:C${row}`);
+    worksheet.mergeCells(`A${row}:B${row}`);
     row++;
     
     // Period
     worksheet.getCell(`A${row}`).value = cashFlow.periodDescription;
     worksheet.getCell(`A${row}`).font = { bold: true };
     worksheet.getCell(`A${row}`).alignment = { horizontal: 'center' };
-    worksheet.mergeCells(`A${row}:C${row}`);
+    worksheet.mergeCells(`A${row}:B${row}`);
     row += 2;
     
     // Column headers
     worksheet.getCell(`A${row}`).value = 'Description';
     worksheet.getCell(`B${row}`).value = 'Amount (thousands)';
-    worksheet.getCell(`C${row}`).value = 'Source (csv file)';
     worksheet.getCell(`A${row}`).font = { bold: true };
     worksheet.getCell(`B${row}`).font = { bold: true };
-    worksheet.getCell(`C${row}`).font = { bold: true };
     row++;
     
     // Operating Activities Header
@@ -627,11 +611,6 @@ async function createExcelFile(cashFlow) {
                 const numericAmount = Number(item.amount);
                 worksheet.getCell(`B${row}`).value = numericAmount;
                 worksheet.getCell(`B${row}`).numFmt = '#,##0_);(#,##0)';
-            }
-            
-            // Add source information
-            if (item.source) {
-                worksheet.getCell(`C${row}`).value = item.source;
             }
             
             // Apply styling based on item type
@@ -654,11 +633,6 @@ async function createExcelFile(cashFlow) {
         worksheet.getCell(`B${row}`).value = numericAmount;
         worksheet.getCell(`B${row}`).numFmt = '#,##0_);(#,##0)';
         
-        // Add source information
-        if (item.source) {
-            worksheet.getCell(`C${row}`).value = item.source;
-        }
-        
         if (item.isTotal) {
             worksheet.getCell(`A${row}`).font = { bold: true };
             worksheet.getCell(`B${row}`).font = { bold: true };
@@ -677,11 +651,6 @@ async function createExcelFile(cashFlow) {
         worksheet.getCell(`B${row}`).value = numericAmount;
         worksheet.getCell(`B${row}`).numFmt = '#,##0_);(#,##0)';
         
-        // Add source information
-        if (item.source) {
-            worksheet.getCell(`C${row}`).value = item.source;
-        }
-        
         if (item.isTotal) {
             worksheet.getCell(`A${row}`).font = { bold: true };
             worksheet.getCell(`B${row}`).font = { bold: true };
@@ -693,7 +662,6 @@ async function createExcelFile(cashFlow) {
     const netCashChangeAmount = Number(cashFlow.netCashChange);
     worksheet.getCell(`A${row}`).value = netCashChangeAmount < 0 ? 'Net decrease in cash and cash equivalents' : 'Net increase in cash and cash equivalents';
     worksheet.getCell(`B${row}`).value = netCashChangeAmount;
-    worksheet.getCell(`C${row}`).value = 'Formula';
     worksheet.getCell(`A${row}`).font = { bold: true };
     worksheet.getCell(`B${row}`).font = { bold: true };
     worksheet.getCell(`B${row}`).numFmt = '#,##0_);(#,##0)';
@@ -703,7 +671,6 @@ async function createExcelFile(cashFlow) {
     const beginningCashAmount = Number(cashFlow.beginningCash);
     worksheet.getCell(`A${row}`).value = 'Cash and cash equivalents at beginning of period';
     worksheet.getCell(`B${row}`).value = beginningCashAmount;
-    worksheet.getCell(`C${row}`).value = 'Quarterly Balance Sheet';
     worksheet.getCell(`B${row}`).numFmt = '#,##0_);(#,##0)';
     row++;
     
@@ -711,21 +678,8 @@ async function createExcelFile(cashFlow) {
     const endingCashAmount = Number(cashFlow.endingCash);
     worksheet.getCell(`A${row}`).value = 'Cash and cash equivalents at end of period';
     worksheet.getCell(`B${row}`).value = endingCashAmount;
-    worksheet.getCell(`C${row}`).value = 'Formula';
     worksheet.getCell(`A${row}`).font = { bold: true };
     worksheet.getCell(`B${row}`).font = { bold: true };
-    worksheet.getCell(`B${row}`).numFmt = '#,##0_);(#,##0)';
-    row += 2;
-    
-    // Verification row - ending cash from balance sheet
-    worksheet.getCell(`B${row}`).value = endingCashAmount;
-    worksheet.getCell(`C${row}`).value = 'Quarterly Balance Sheet';
-    worksheet.getCell(`B${row}`).numFmt = '#,##0_);(#,##0)';
-    row++;
-    
-    // Verification row - difference (should be 0)
-    worksheet.getCell(`B${row}`).value = 0;
-    worksheet.getCell(`C${row}`).value = 'Formula (to check)';
     worksheet.getCell(`B${row}`).numFmt = '#,##0_);(#,##0)';
     
     return await workbook.xlsx.writeBuffer();
