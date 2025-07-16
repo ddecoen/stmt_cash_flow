@@ -4,6 +4,12 @@
     "api/upload.js": {
       "maxDuration": 30
     },
+    "api/upload-simple.js": {
+      "maxDuration": 30
+    },
+    "api/csv-upload.js": {
+      "maxDuration": 30
+    },
     "api/test-upload.js": {
       "maxDuration": 10
     }
