@@ -108,18 +108,27 @@
         <div class="instructions">
             <h3>Instructions:</h3>
             <ul>
-                <li>Export your NetSuite <strong>Comparative Balance Sheet</strong> as a CSV file</li>
-                <li>Upload the CSV file using the form below</li>
+                <li>Export your <strong>Quarterly Balance Sheet</strong> as a CSV file</li>
+                <li>Export your <strong>Quarterly Income Statement</strong> as a CSV file</li>
+                <li>Upload both CSV files using the form below</li>
                 <li>Download the generated GAAP-compliant Cash Flow Statement in Excel format</li>
             </ul>
-            <p><strong>Note:</strong> This tool analyzes balance sheet changes to create cash flow statements using the indirect method.</p>
+            <p><strong>Note:</strong> This tool combines balance sheet changes with income statement data to create comprehensive cash flow statements using the indirect method. Net income, depreciation, interest income, and dividend income will be extracted from the income statement, while working capital changes come from the balance sheet.</p>
         </div>
 
         <form id="uploadForm" enctype="multipart/form-data">
             <div class="upload-area">
-                <p>Drag and drop your NetSuite Balance Sheet CSV file here, or click to select</p>
-                <input type="file" id="csvfile" name="csvfile" accept=".csv" required>
+                <h3>Balance Sheet File</h3>
+                <p>Upload your quarterly balance sheet CSV file</p>
+                <input type="file" id="balanceSheetFile" name="balanceSheetFile" accept=".csv" required>
             </div>
+            
+            <div class="upload-area">
+                <h3>Income Statement File</h3>
+                <p>Upload your quarterly income statement CSV file</p>
+                <input type="file" id="incomeStatementFile" name="incomeStatementFile" accept=".csv" required>
+            </div>
+            
             <button type="submit" id="submitBtn">Generate Cash Flow Statement</button>
         </form>
 
@@ -141,19 +150,31 @@
             e.preventDefault();
             
             const formData = new FormData();
-            const file = document.getElementById('csvfile').files[0];
+            const balanceSheetFile = document.getElementById('balanceSheetFile').files[0];
+            const incomeStatementFile = document.getElementById('incomeStatementFile').files[0];
             
-            if (!file) {
-                showResult('Please select a CSV file.', 'error');
+            if (!balanceSheetFile) {
+                showResult('Please select a balance sheet CSV file.', 'error');
                 return;
             }
             
-            if (!file.name.toLowerCase().endsWith('.csv')) {
-                showResult('Please select a valid CSV file.', 'error');
+            if (!incomeStatementFile) {
+                showResult('Please select an income statement CSV file.', 'error');
                 return;
             }
             
-            formData.append('csvfile', file);
+            if (!balanceSheetFile.name.toLowerCase().endsWith('.csv')) {
+                showResult('Please select a valid CSV file for the balance sheet.', 'error');
+                return;
+            }
+            
+            if (!incomeStatementFile.name.toLowerCase().endsWith('.csv')) {
+                showResult('Please select a valid CSV file for the income statement.', 'error');
+                return;
+            }
+            
+            formData.append('balanceSheetFile', balanceSheetFile);
+            formData.append('incomeStatementFile', incomeStatementFile);
             
             loading.style.display = 'block';
             result.style.display = 'none';

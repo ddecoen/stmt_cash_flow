@@ -87,6 +87,54 @@ function parseIncomeStatementData(records) {
     return { netIncome, interestIncome, dividendIncome };
 }
 
+// Parse CSV file buffer into records
+function parseCSVFile(fileBuffer, fileType) {
+    return new Promise((resolve, reject) => {
+        const records = [];
+        const csvStream = Readable.from(fileBuffer.toString());
+        
+        csvStream
+            .pipe(csv({ headers: false }))
+            .on('data', (data) => {
+                const row = Object.values(data);
+                
+                if (fileType === 'balanceSheet') {
+                    // Balance sheet parsing logic
+                    if (row.length >= 4 && row[0]) {
+                        const isTotal = row[0].toLowerCase().includes('total');
+                        const isTotalBank = row[0].toLowerCase().includes('total bank');
+                        const variance = parseAmount(row[3]);
+                        
+                        if (isTotalBank || (!isTotal && variance !== 0)) {
+                            records.push({
+                                account: row[0],
+                                currentAmount: parseAmount(row[1]),
+                                priorAmount: parseAmount(row[2]),
+                                variance: variance,
+                                accountType: 'Balance Sheet'
+                            });
+                        }
+                    }
+                } else if (fileType === 'incomeStatement') {
+                    // Income statement parsing logic
+                    if (row.length >= 2 && row[0]) {
+                        const record = {};
+                        const keys = Object.keys(data);
+                        record[keys[0]] = row[0];
+                        record[keys[1]] = row[1];
+                        records.push(record);
+                    }
+                }
+            })
+            .on('end', () => {
+                resolve(records);
+            })
+            .on('error', (error) => {
+                reject(error);
+            });
+    });
+}
+
 // Categorize account for cash flow with specific line items based on NetSuite account names
 function categorizeAccount(accountName, accountType) {
     const name = accountName.toLowerCase();
@@ -170,8 +218,22 @@ function adjustAmountForCashFlow(amount, accountType) {
     return amount;
 }
 
+// Generate cash flow statement from both balance sheet and income statement data
+function generateCashFlowStatementFromBothFiles(balanceSheetRecords, incomeStatementRecords) {
+    // Extract income statement data
+    const incomeData = parseIncomeStatementData(incomeStatementRecords);
+    const netIncome = incomeData.netIncome;
+    const interestIncome = incomeData.interestIncome;
+    const dividendIncome = incomeData.dividendIncome;
+    
+    console.log('Extracted Income Data:', { netIncome, interestIncome, dividendIncome });
+    
+    // Use balance sheet records for working capital changes and other cash flow items
+    return generateCashFlowStatement(balanceSheetRecords, { netIncome, interestIncome, dividendIncome });
+}
+
 // Generate cash flow statement with exact format matching the provided template
-function generateCashFlowStatement(records) {
+function generateCashFlowStatement(records, incomeData = null) {
     // Initialize line item aggregators
     const lineItems = {
         operating: {},
@@ -179,28 +241,40 @@ function generateCashFlowStatement(records) {
         financing: {}
     };
     
-    // Check if this is an income statement format
-    const isIncomeStatement = isIncomeStatementFormat(records);
-    
-    // Calculate net income from income statement data and find beginning cash
+    // Use provided income data if available, otherwise detect format and parse
     let netIncome = 0;
     let beginningCash = 0;
     let dividendIncome = 0;
     let interestIncome = 0;
     
-    if (isIncomeStatement) {
-        // Parse income statement format
-        const incomeData = parseIncomeStatementData(records);
-        netIncome = incomeData.netIncome;
-        interestIncome = incomeData.interestIncome;
-        dividendIncome = incomeData.dividendIncome;
+    if (incomeData) {
+        // Use provided income data from separate income statement file
+        netIncome = incomeData.netIncome || 0;
+        interestIncome = incomeData.interestIncome || 0;
+        dividendIncome = incomeData.dividendIncome || 0;
         
-        console.log('Income Statement Data:', {
+        console.log('Using provided income data:', {
             netIncome,
             interestIncome,
             dividendIncome
         });
     } else {
+        // Check if this is an income statement format
+        const isIncomeStatement = isIncomeStatementFormat(records);
+        
+        if (isIncomeStatement) {
+            // Parse income statement format
+            const parsedIncomeData = parseIncomeStatementData(records);
+            netIncome = parsedIncomeData.netIncome;
+            interestIncome = parsedIncomeData.interestIncome;
+            dividendIncome = parsedIncomeData.dividendIncome;
+            
+            console.log('Parsed Income Statement Data:', {
+                netIncome,
+                interestIncome,
+                dividendIncome
+            });
+        } else {
         // Original balance sheet format parsing
         for (const record of records) {
             // Calculate net income from income statement components
@@ -584,50 +658,32 @@ export default async function handler(req, res) {
     }
     
     return new Promise((resolve) => {
-        upload.single('csvfile')(req, res, async (err) => {
+        upload.fields([{ name: 'balanceSheetFile', maxCount: 1 }, { name: 'incomeStatementFile', maxCount: 1 }])(req, res, async (err) => {
             if (err) {
-                res.status(400).send('Error uploading file');
+                res.status(400).send('Error uploading files');
                 return resolve();
             }
             
-            if (!req.file) {
-                res.status(400).send('No file uploaded');
+            if (!req.files || !req.files.balanceSheetFile || !req.files.incomeStatementFile) {
+                res.status(400).send('Both balance sheet and income statement files are required');
                 return resolve();
             }
             
             try {
-                const records = [];
-                const csvStream = Readable.from(req.file.buffer.toString());
+                // Parse both CSV files
+                const balanceSheetFile = req.files.balanceSheetFile[0];
+                const incomeStatementFile = req.files.incomeStatementFile[0];
                 
-                // Parse CSV
-                await new Promise((resolve, reject) => {
-                    csvStream
-                        .pipe(csv({ headers: false }))
-                        .on('data', (data) => {
-                            const row = Object.values(data);
-                            if (row.length >= 4 && row[0]) {
-                                // Include Total Bank for cash extraction, but exclude other totals for cash flow items
-                                const isTotal = row[0].toLowerCase().includes('total');
-                                const isTotalBank = row[0].toLowerCase().includes('total bank');
-                                const variance = parseAmount(row[3]);
-                                
-                                if (isTotalBank || (!isTotal && variance !== 0)) {
-                                    records.push({
-                                        account: row[0],
-                                        currentAmount: parseAmount(row[1]),
-                                        priorAmount: parseAmount(row[2]),
-                                        variance: variance,
-                                        accountType: 'Balance Sheet'
-                                    });
-                                }
-                            }
-                        })
-                        .on('end', resolve)
-                        .on('error', reject);
-                });
+                const [balanceSheetRecords, incomeStatementRecords] = await Promise.all([
+                    parseCSVFile(balanceSheetFile.buffer, 'balanceSheet'),
+                    parseCSVFile(incomeStatementFile.buffer, 'incomeStatement')
+                ]);
                 
-                // Generate cash flow statement
-                const cashFlow = generateCashFlowStatement(records);
+                console.log('Balance Sheet Records:', balanceSheetRecords.length);
+                console.log('Income Statement Records:', incomeStatementRecords.length);
+                
+                // Generate cash flow statement using both datasets
+                const cashFlow = generateCashFlowStatementFromBothFiles(balanceSheetRecords, incomeStatementRecords);
                 
                 // Create Excel file
                 const excelBuffer = await createExcelFile(cashFlow);
