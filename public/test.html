@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upload Test Page</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .test-section {
+            border: 1px solid #ccc;
+            margin: 20px 0;
+            padding: 20px;
+            border-radius: 5px;
+        }
+        .test-section h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        input[type="file"] {
+            margin: 10px 0;
+            padding: 5px;
+            width: 100%;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .result {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 5px;
+            display: none;
+        }
+        .success {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+    </style>
+</head>
+<body>
+    <h1>Upload Endpoint Testing</h1>
+    <p>This page helps test different upload endpoints to isolate the FUNCTION_INVOCATION_FAILED issue.</p>
+    
+    <div class="test-section">
+        <h3>Test 1: Health Check (GET)</h3>
+        <p>Tests basic function execution with no dependencies.</p>
+        <button onclick="testHealth()">Test Health Endpoint</button>
+        <div id="health-result" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h3>Test 2: Simple Upload (No Multer)</h3>
+        <p>Tests file upload without multer dependency.</p>
+        <input type="file" id="simple-file1" accept=".csv">
+        <input type="file" id="simple-file2" accept=".csv">
+        <button onclick="testSimpleUpload()">Test Simple Upload</button>
+        <div id="simple-result" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h3>Test 3: Modern Upload (Formidable)</h3>
+        <p>Tests file upload with formidable (Vercel recommended).</p>
+        <input type="file" id="modern-file1" accept=".csv">
+        <input type="file" id="modern-file2" accept=".csv">
+        <button onclick="testModernUpload()">Test Modern Upload</button>
+        <div id="modern-result" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h3>Test 4: Original Upload (Multer)</h3>
+        <p>Tests the original upload with multer.</p>
+        <input type="file" id="original-file1" accept=".csv">
+        <input type="file" id="original-file2" accept=".csv">
+        <button onclick="testOriginalUpload()">Test Original Upload</button>
+        <div id="original-result" class="result"></div>
+    </div>
+
+    <script>
+        function showResult(elementId, message, isError = false) {
+            const element = document.getElementById(elementId);
+            element.textContent = message;
+            element.className = `result ${isError ? 'error' : 'success'}`;
+            element.style.display = 'block';
+        }
+        
+        async function testHealth() {
+            try {
+                const response = await fetch('/api/health');
+                const data = await response.json();
+                showResult('health-result', `✅ Success: ${JSON.stringify(data)}`);
+            } catch (error) {
+                showResult('health-result', `❌ Error: ${error.message}`, true);
+            }
+        }
+        
+        async function testSimpleUpload() {
+            const file1 = document.getElementById('simple-file1').files[0];
+            const file2 = document.getElementById('simple-file2').files[0];
+            
+            if (!file1 || !file2) {
+                showResult('simple-result', '❌ Please select both files', true);
+                return;
+            }
+            
+            try {
+                const formData = new FormData();
+                formData.append('balanceSheetFile', file1);
+                formData.append('incomeStatementFile', file2);
+                
+                const response = await fetch('/api/simple-upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                if (response.ok) {
+                    showResult('simple-result', `✅ Success: ${JSON.stringify(data)}`);
+                } else {
+                    showResult('simple-result', `❌ Error: ${JSON.stringify(data)}`, true);
+                }
+            } catch (error) {
+                showResult('simple-result', `❌ Error: ${error.message}`, true);
+            }
+        }
+        
+        async function testModernUpload() {
+            const file1 = document.getElementById('modern-file1').files[0];
+            const file2 = document.getElementById('modern-file2').files[0];
+            
+            if (!file1 || !file2) {
+                showResult('modern-result', '❌ Please select both files', true);
+                return;
+            }
+            
+            try {
+                const formData = new FormData();
+                formData.append('balanceSheetFile', file1);
+                formData.append('incomeStatementFile', file2);
+                
+                const response = await fetch('/api/modern-upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                if (response.ok) {
+                    showResult('modern-result', `✅ Success: ${JSON.stringify(data)}`);
+                } else {
+                    showResult('modern-result', `❌ Error: ${JSON.stringify(data)}`, true);
+                }
+            } catch (error) {
+                showResult('modern-result', `❌ Error: ${error.message}`, true);
+            }
+        }
+        
+        async function testOriginalUpload() {
+            const file1 = document.getElementById('original-file1').files[0];
+            const file2 = document.getElementById('original-file2').files[0];
+            
+            if (!file1 || !file2) {
+                showResult('original-result', '❌ Please select both files', true);
+                return;
+            }
+            
+            try {
+                const formData = new FormData();
+                formData.append('balanceSheetFile', file1);
+                formData.append('incomeStatementFile', file2);
+                
+                const response = await fetch('/api/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                if (response.ok) {
+                    showResult('original-result', `✅ Success: ${JSON.stringify(data)}`);
+                } else {
+                    showResult('original-result', `❌ Error: ${JSON.stringify(data)}`, true);
+                }
+            } catch (error) {
+                showResult('original-result', `❌ Error: ${error.message}`, true);
+            }
+        }
+    </script>
+</body>
+</html>
