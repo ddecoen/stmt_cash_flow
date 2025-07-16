@@ -263,7 +263,15 @@ function generateCashFlowStatement(records, incomeData = null) {
     }
     
     // Process balance sheet records for cash and working capital changes
+    console.log('Processing', records.length, 'balance sheet records');
+    console.log('Sample record keys:', records.length > 0 ? Object.keys(records[0]) : 'No records');
+    
     for (const record of records) {
+        // Debug: Log records that might be cash-related
+        if (record['Financial Row'] && record['Financial Row'].toLowerCase().includes('cash')) {
+            console.log('Cash-related record:', record['Financial Row'], record);
+        }
+        
         // Extract beginning and ending cash from Total Bank
         if (record['Financial Row'] && record['Financial Row'].toLowerCase().includes('total - 11000 - cash and cash equivalents')) {
             beginningCash = parseAmount(record['Comparison Amount (As of Mar 2025)']) || 0;
@@ -274,6 +282,8 @@ function generateCashFlowStatement(records, incomeData = null) {
         if (!record['Variance'] || parseAmount(record['Variance']) === 0) continue;
         
         const categorization = categorizeAccount(record['Financial Row'], record['Account Type']);
+        console.log('Account:', record['Financial Row'], 'Categorization:', categorization, 'Variance:', record['Variance']);
+        
         if (categorization === 'cash' || categorization === 'skip') continue;
         
         const variance = parseAmount(record['Variance']);
@@ -300,6 +310,7 @@ function generateCashFlowStatement(records, incomeData = null) {
             }
             
             lineItems[category][lineItem] += adjustedAmount;
+            console.log('Added to', category, lineItem, ':', adjustedAmount, 'Total now:', lineItems[category][lineItem]);
         }
     }
     
