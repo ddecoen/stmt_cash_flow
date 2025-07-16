@@ -10,6 +10,9 @@
     "api/csv-upload.js": {
       "maxDuration": 30
     },
+    "api/generate-csv.js": {
+      "maxDuration": 30
+    },
     "api/test-upload.js": {
       "maxDuration": 10
     }
