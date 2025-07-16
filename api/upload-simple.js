@@ -566,9 +566,13 @@ export default async function handler(req, res) {
                 // Create CSV file
                 const csvContent = createCSVFile(cashFlow);
                 
-                // Send CSV file
-                res.setHeader('Content-Type', 'text/csv');
-                res.setHeader('Content-Disposition', 'attachment; filename="cash_flow_statement.csv"');
+                console.log('Generated CSV content length:', csvContent.length);
+                console.log('CSV content preview:', csvContent.substring(0, 200));
+                
+                // Send CSV file with explicit headers
+                res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+                res.setHeader('Content-Disposition', 'attachment; filename=cash_flow_statement.csv');
+                res.setHeader('Cache-Control', 'no-cache');
                 res.send(csvContent);
                 
                 // Clean up temporary files
