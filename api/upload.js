@@ -18,12 +18,73 @@ function parseAmount(amountStr) {
         .replace(/,/g, '')
         .replace(/\$/g, '')
         .replace(/\(/g, '-')
-        .replace(/\)/g, '');
+        .replace(/\)/g, '')
+        .replace(/"/g, '')
+        .trim();
     
     if (cleaned === '' || cleaned === '-') return 0;
     
     const parsed = parseFloat(cleaned);
     return isNaN(parsed) ? 0 : parsed;
+}
+
+// Detect if CSV is an income statement format
+function isIncomeStatementFormat(records) {
+    if (!records || records.length === 0) return false;
+    
+    // Check for income statement indicators
+    const hasIncomeStatementHeaders = records.some(record => {
+        const firstKey = Object.keys(record)[0];
+        const value = record[firstKey] || '';
+        const valueLower = value.toLowerCase();
+        return valueLower.includes('income statement') ||
+               valueLower.includes('net income') ||
+               valueLower.includes('gross profit') ||
+               valueLower.includes('total - income') ||
+               valueLower.includes('interest income') ||
+               valueLower.includes('dividend income');
+    });
+    
+    // Check if it has the two-column format (Financial Row, Amount)
+    const hasTwoColumnFormat = records.length > 0 && 
+        Object.keys(records[0]).length === 2;
+    
+    return hasIncomeStatementHeaders || hasTwoColumnFormat;
+}
+
+// Parse income statement CSV format
+function parseIncomeStatementData(records) {
+    let netIncome = 0;
+    let interestIncome = 0;
+    let dividendIncome = 0;
+    
+    for (const record of records) {
+        const keys = Object.keys(record);
+        if (keys.length < 2) continue;
+        
+        const description = record[keys[0]] || '';
+        const amount = record[keys[1]] || '';
+        
+        const descLower = description.toLowerCase();
+        const parsedAmount = parseAmount(amount);
+        
+        // Extract net income
+        if (descLower.includes('net income')) {
+            netIncome = parsedAmount;
+        }
+        
+        // Extract interest income
+        if (descLower.includes('interest income')) {
+            interestIncome = parsedAmount;
+        }
+        
+        // Extract dividend income
+        if (descLower.includes('dividend income')) {
+            dividendIncome = parsedAmount;
+        }
+    }
+    
+    return { netIncome, interestIncome, dividendIncome };
 }
 
 // Categorize account for cash flow with specific line items based on NetSuite account names
@@ -118,56 +179,74 @@ function generateCashFlowStatement(records) {
         financing: {}
     };
     
+    // Check if this is an income statement format
+    const isIncomeStatement = isIncomeStatementFormat(records);
+    
     // Calculate net income from income statement data and find beginning cash
     let netIncome = 0;
     let beginningCash = 0;
     let dividendIncome = 0;
     let interestIncome = 0;
     
-    for (const record of records) {
-        // Calculate net income from income statement components
-        if (record.account && record.accountType) {
-            const amount = parseAmount(record.currentAmount) || parseAmount(record.variance) || 0;
-            const accountType = record.accountType.toLowerCase();
-            const accountName = record.account.toLowerCase();
-            
-            // Income items (positive contribution to net income)
-            if (accountType.includes('income') || accountName.includes('revenue') || accountName.includes('sales')) {
-                netIncome += amount;
-            }
-            // Expense items (negative contribution to net income)
-            else if (accountType.includes('expense') || accountType.includes('cost of goods sold')) {
-                netIncome += amount; // Amount is already negative in the data
-            }
-            
-            // Track dividend and interest income for adjustments
-            if (accountName.includes('dividend') && accountType.includes('income')) {
-                dividendIncome += amount;
-            }
-            if (accountName.includes('interest') && accountType.includes('income')) {
-                interestIncome += amount;
-            }
-        }
+    if (isIncomeStatement) {
+        // Parse income statement format
+        const incomeData = parseIncomeStatementData(records);
+        netIncome = incomeData.netIncome;
+        interestIncome = incomeData.interestIncome;
+        dividendIncome = incomeData.dividendIncome;
         
-        // Extract net income from existing net income accounts if present
-        if (record.account && record.account.toLowerCase().includes('net income')) {
-            const currentAmount = parseAmount(record.currentAmount) || 0;
-            const priorAmount = parseAmount(record.priorAmount) || 0;
-            const variance = parseAmount(record.variance) || 0;
-            
-            // For first quarter (prior amount is 0), use current amount
-            // For subsequent quarters, use variance
-            if (priorAmount === 0) {
-                netIncome = currentAmount;
-            } else {
-                netIncome = variance;
+        console.log('Income Statement Data:', {
+            netIncome,
+            interestIncome,
+            dividendIncome
+        });
+    } else {
+        // Original balance sheet format parsing
+        for (const record of records) {
+            // Calculate net income from income statement components
+            if (record.account && record.accountType) {
+                const amount = parseAmount(record.currentAmount) || parseAmount(record.variance) || 0;
+                const accountType = record.accountType.toLowerCase();
+                const accountName = record.account.toLowerCase();
+                
+                // Income items (positive contribution to net income)
+                if (accountType.includes('income') || accountName.includes('revenue') || accountName.includes('sales')) {
+                    netIncome += amount;
+                }
+                // Expense items (negative contribution to net income)
+                else if (accountType.includes('expense') || accountType.includes('cost of goods sold')) {
+                    netIncome += amount; // Amount is already negative in the data
+                }
+                
+                // Track dividend and interest income for adjustments
+                if (accountName.includes('dividend') && accountType.includes('income')) {
+                    dividendIncome += amount;
+                }
+                if (accountName.includes('interest') && accountType.includes('income')) {
+                    interestIncome += amount;
+                }
             }
-        }
-        
-        // Extract beginning cash from Total Bank - Comparison Amount column
-        if (record.account && record.account.toLowerCase().includes('total bank')) {
-            beginningCash = parseAmount(record.priorAmount) || 0;
-            console.log('Found Total Bank:', record.account, 'Prior Amount:', record.priorAmount, 'Parsed:', beginningCash);
+            
+            // Extract net income from existing net income accounts if present
+            if (record.account && record.account.toLowerCase().includes('net income')) {
+                const currentAmount = parseAmount(record.currentAmount) || 0;
+                const priorAmount = parseAmount(record.priorAmount) || 0;
+                const variance = parseAmount(record.variance) || 0;
+                
+                // For first quarter (prior amount is 0), use current amount
+                // For subsequent quarters, use variance
+                if (priorAmount === 0) {
+                    netIncome = currentAmount;
+                } else {
+                    netIncome = variance;
+                }
+            }
+            
+            // Extract beginning cash from Total Bank - Comparison Amount column
+            if (record.account && record.account.toLowerCase().includes('total bank')) {
+                beginningCash = parseAmount(record.priorAmount) || 0;
+                console.log('Found Total Bank:', record.account, 'Prior Amount:', record.priorAmount, 'Parsed:', beginningCash);
+            }
         }
     }
     
