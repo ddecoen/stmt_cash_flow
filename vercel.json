@@ -1,3 +1,11 @@
 {
-  "version": 2
+  "version": 2,
+  "functions": {
+    "api/upload.js": {
+      "maxDuration": 30
+    },
+    "api/test-upload.js": {
+      "maxDuration": 10
+    }
+  }
 }
