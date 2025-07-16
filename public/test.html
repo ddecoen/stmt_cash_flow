@@ -86,12 +86,21 @@
     </div>
     
     <div class="test-section">
-        <h3>Test 4: Original Upload (Multer)</h3>
-        <p>Tests the original upload with multer.</p>
+        <h3>Test 4: Original Upload (Formidable)</h3>
+        <p>Tests the updated original upload with formidable.</p>
         <input type="file" id="original-file1" accept=".csv">
         <input type="file" id="original-file2" accept=".csv">
         <button onclick="testOriginalUpload()">Test Original Upload</button>
         <div id="original-result" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h3>Test 5: Simplified Upload (Formidable)</h3>
+        <p>Tests a simplified version that focuses on income statement processing.</p>
+        <input type="file" id="simple-file1" accept=".csv">
+        <input type="file" id="simple-file2" accept=".csv">
+        <button onclick="testSimplifiedUpload()">Test Simplified Upload</button>
+        <div id="simplified-result" class="result"></div>
     </div>
 
     <script>
@@ -191,14 +200,74 @@
                     body: formData
                 });
                 
-                const data = await response.json();
                 if (response.ok) {
-                    showResult('original-result', `✅ Success: ${JSON.stringify(data)}`);
+                    // Check if it's a file download
+                    const contentType = response.headers.get('content-type');
+                    if (contentType && contentType.includes('spreadsheetml')) {
+                        showResult('original-result', '✅ Success: Excel file generated and downloaded!');
+                        // Trigger download
+                        const blob = await response.blob();
+                        const url = window.URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = 'cash_flow_statement.xlsx';
+                        a.click();
+                        window.URL.revokeObjectURL(url);
+                    } else {
+                        const data = await response.json();
+                        showResult('original-result', `✅ Success: ${JSON.stringify(data)}`);
+                    }
                 } else {
+                    const data = await response.json();
                     showResult('original-result', `❌ Error: ${JSON.stringify(data)}`, true);
                 }
             } catch (error) {
                 showResult('original-result', `❌ Error: ${error.message}`, true);
+            }
+        }
+        
+        async function testSimplifiedUpload() {
+            const file1 = document.getElementById('simple-file1').files[0];
+            const file2 = document.getElementById('simple-file2').files[0];
+            
+            if (!file1 || !file2) {
+                showResult('simplified-result', '❌ Please select both files', true);
+                return;
+            }
+            
+            try {
+                const formData = new FormData();
+                formData.append('balanceSheetFile', file1);
+                formData.append('incomeStatementFile', file2);
+                
+                const response = await fetch('/api/upload-simple', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (response.ok) {
+                    // Check if it's a file download
+                    const contentType = response.headers.get('content-type');
+                    if (contentType && contentType.includes('spreadsheetml')) {
+                        showResult('simplified-result', '✅ Success: Simple Excel file generated and downloaded!');
+                        // Trigger download
+                        const blob = await response.blob();
+                        const url = window.URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = 'simple_cash_flow_statement.xlsx';
+                        a.click();
+                        window.URL.revokeObjectURL(url);
+                    } else {
+                        const data = await response.json();
+                        showResult('simplified-result', `✅ Success: ${JSON.stringify(data)}`);
+                    }
+                } else {
+                    const data = await response.json();
+                    showResult('simplified-result', `❌ Error: ${JSON.stringify(data)}`, true);
+                }
+            } catch (error) {
+                showResult('simplified-result', `❌ Error: ${error.message}`, true);
             }
         }
     </script>
