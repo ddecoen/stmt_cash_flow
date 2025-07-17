@@ -13,6 +13,9 @@
     "api/generate-csv.js": {
       "maxDuration": 30
     },
+    "api/cash-flow-final.js": {
+      "maxDuration": 30
+    },
     "api/test-upload.js": {
       "maxDuration": 10
     }
