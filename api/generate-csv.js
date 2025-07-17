@@ -1,4 +1,5 @@
 const csv = require('csv-parser');
+const ExcelJS = require('exceljs');
 const { IncomingForm } = require('formidable');
 const { Readable } = require('stream');
 const fs = require('fs');
@@ -14,6 +15,7 @@ export const config = {
 function parseAmount(amountStr) {
     if (!amountStr) return 0;
     
+    // Convert to string first, then trim
     const strValue = amountStr.toString().trim();
     if (strValue === '') return 0;
     
@@ -31,7 +33,7 @@ function parseAmount(amountStr) {
     return isNaN(parsed) ? 0 : parsed;
 }
 
-// Format amount for CSV output
+// Format amount for CSV output with proper parentheses for negatives
 function formatAmountForCSV(amount) {
     if (amount === null || amount === undefined) return '';
     const numericAmount = Number(amount);
@@ -43,74 +45,137 @@ function formatAmountForCSV(amount) {
     return numericAmount < 0 ? `"(${formattedAmount})"` : `"${formattedAmount}"`;
 }
 
-// Create CSV content from cash flow data
-function createCSVContent(cashFlow) {
-    const lines = [];
+// Create CSV file with exact format matching the template
+function createCSVFile(cashFlow) {
+    const csvLines = [];
     
-    // Header
-    lines.push('"Coder Technologies, Inc.",,');
-    lines.push('CONDENSED CONSOLIDATED STATEMENTS OF CASH FLOWS,,');
-    lines.push('(amounts in thousands),,');
-    lines.push('(unaudited),,');
-    lines.push('"Three Months Ended June 30, 2025",,');
-    lines.push(',,');
-    lines.push('Description,Amount (thousands),Source (csv file)');
+    // Header rows
+    csvLines.push('"Coder Technologies, Inc.",,');
+    csvLines.push('CONDENSED CONSOLIDATED STATEMENTS OF CASH FLOWS,,');
+    csvLines.push('(amounts in thousands),,');
+    csvLines.push('(unaudited),,');
+    csvLines.push('"Three Months Ended June 30, 2025",,');
+    csvLines.push(',,');
+    csvLines.push('Description,Amount (thousands),Source (csv file)');
     
     // Operating Activities
-    lines.push('Cash flows from operating activities,,');
+    csvLines.push('Cash flows from operating activities,,');
     
     for (const item of cashFlow.operatingActivities) {
         if (item.amount === null && item.isHeader) {
-            lines.push(`${item.description},,`);
+            csvLines.push(`${item.description},,`);
         } else if (item.amount !== null) {
             const formattedAmount = formatAmountForCSV(item.amount);
             const source = item.source || '';
-            lines.push(`${item.description},${formattedAmount},${source}`);
+            csvLines.push(`${item.description},${formattedAmount},${source}`);
         }
     }
     
     // Investing Activities
-    if (cashFlow.investingActivities && cashFlow.investingActivities.length > 0) {
-        lines.push('Cash flows from investing activities,,');
+    if (cashFlow.investingActivities.length > 0) {
+        csvLines.push('Cash flows from investing activities,,');
         for (const item of cashFlow.investingActivities) {
             const formattedAmount = formatAmountForCSV(item.amount);
             const source = item.source || '';
-            lines.push(`${item.description},${formattedAmount},${source}`);
+            csvLines.push(`${item.description},${formattedAmount},${source}`);
         }
     }
     
     // Financing Activities
-    if (cashFlow.financingActivities && cashFlow.financingActivities.length > 0) {
-        lines.push('Cash flows from financing activities,,');
+    if (cashFlow.financingActivities.length > 0) {
+        csvLines.push('Cash flows from financing activities,,');
         for (const item of cashFlow.financingActivities) {
             const formattedAmount = formatAmountForCSV(item.amount);
             const source = item.source || '';
-            lines.push(`${item.description},${formattedAmount},${source}`);
+            csvLines.push(`${item.description},${formattedAmount},${source}`);
         }
     }
     
     // Net change in cash
-    const netCashChangeAmount = Number(cashFlow.netCashChange || 0);
+    const netCashChangeAmount = Number(cashFlow.netCashChange);
     const netChangeDescription = netCashChangeAmount < 0 ? 'Net decrease in cash and cash equivalents' : 'Net increase in cash and cash equivalents';
-    lines.push(`${netChangeDescription},${formatAmountForCSV(netCashChangeAmount)},Formula`);
+    csvLines.push(`${netChangeDescription},${formatAmountForCSV(netCashChangeAmount)},Formula`);
     
     // Beginning and ending cash
-    lines.push(`Cash and cash equivalents at beginning of period,${formatAmountForCSV(cashFlow.beginningCash || 0)},Quarterly Balance Sheet`);
-    lines.push(`Cash and cash equivalents at end of period,${formatAmountForCSV(cashFlow.endingCash || 0)},Formula`);
+    csvLines.push(`Cash and cash equivalents at beginning of period,${formatAmountForCSV(cashFlow.beginningCash)},Quarterly Balance Sheet`);
+    csvLines.push(`Cash and cash equivalents at end of period,${formatAmountForCSV(cashFlow.endingCash)},Formula`);
     
     // Validation check
-    lines.push(',,');
-    lines.push(`,${formatAmountForCSV(cashFlow.actualEndingCash || 0)},Quarterly Balance Sheet`);
-    const validationDifference = (cashFlow.endingCash || 0) - (cashFlow.actualEndingCash || 0);
-    lines.push(`,${formatAmountForCSV(validationDifference)},Formula (to check)`);
+    csvLines.push(',,');
+    csvLines.push(`,${formatAmountForCSV(cashFlow.actualEndingCash)},Quarterly Balance Sheet`);
+    const validationDifference = cashFlow.endingCash - cashFlow.actualEndingCash;
+    csvLines.push(`,${formatAmountForCSV(validationDifference)},Formula (to check)`);
     
-    return lines.join('\n');
+    return csvLines.join('\n');
 }
 
-// Parse CSV file
+// Detect if CSV is an income statement format
+function isIncomeStatementFormat(records) {
+    if (!records || records.length === 0) return false;
+    
+    // Check for income statement indicators
+    const hasIncomeStatementHeaders = records.some(record => {
+        const firstKey = Object.keys(record)[0];
+        const value = record[firstKey] || '';
+        const valueLower = value.toLowerCase();
+        return valueLower.includes('income statement') ||
+               valueLower.includes('net income') ||
+               valueLower.includes('gross profit') ||
+               valueLower.includes('total - income') ||
+               valueLower.includes('interest income') ||
+               valueLower.includes('dividend income');
+    });
+    
+    // Check if it has the two-column format (Financial Row, Amount)
+    const hasTwoColumnFormat = records.length > 0 && 
+        Object.keys(records[0]).length === 2;
+    
+    return hasIncomeStatementHeaders || hasTwoColumnFormat;
+}
+
+// Parse income statement CSV format
+function parseIncomeStatementData(records) {
+    let netIncome = 0;
+    let interestIncome = 0;
+    let dividendIncome = 0;
+    
+    for (const record of records) {
+        const keys = Object.keys(record);
+        if (keys.length < 2) continue;
+        
+        const description = record[keys[0]] || '';
+        const amount = record[keys[1]] || '';
+        
+        const descLower = description.toLowerCase();
+        const parsedAmount = parseAmount(amount);
+        
+        // Extract net income
+        if (descLower.includes('net income')) {
+            netIncome = parsedAmount;
+        }
+        
+        // Extract interest income
+        if (descLower.includes('interest income')) {
+            interestIncome = parsedAmount;
+        }
+        
+        // Extract dividend income
+        if (descLower.includes('dividend income')) {
+            dividendIncome = parsedAmount;
+        }
+    }
+    
+    return { netIncome, interestIncome, dividendIncome };
+}
+
+// Parse CSV file buffer into records
 function parseCSVFile(fileBuffer, fileType) {
     return new Promise((resolve, reject) => {
         try {
+            if (!fileBuffer || fileBuffer.length === 0) {
+                throw new Error(`Empty file buffer for ${fileType}`);
+            }
+            
             const records = [];
             const csvContent = fileBuffer.toString('utf8');
             const csvStream = Readable.from(csvContent);
@@ -135,36 +200,6 @@ function parseCSVFile(fileBuffer, fileType) {
     });
 }
 
-// Parse income statement data
-function parseIncomeStatementData(records) {
-    let netIncome = 0;
-    let interestIncome = 0;
-    let dividendIncome = 0;
-    
-    for (const record of records) {
-        const keys = Object.keys(record);
-        if (keys.length < 2) continue;
-        
-        const description = record[keys[0]] || '';
-        const amount = record[keys[1]] || '';
-        
-        const descLower = description.toLowerCase();
-        const parsedAmount = parseAmount(amount);
-        
-        if (descLower.includes('net income')) {
-            netIncome = parsedAmount;
-        }
-        if (descLower.includes('interest income')) {
-            interestIncome = parsedAmount;
-        }
-        if (descLower.includes('dividend income')) {
-            dividendIncome = parsedAmount;
-        }
-    }
-    
-    return { netIncome, interestIncome, dividendIncome };
-}
-
 // Categorize account for cash flow statement
 function categorizeAccount(account, accountType) {
     if (!account) return 'skip';
@@ -177,56 +212,44 @@ function categorizeAccount(account, accountType) {
         return 'cash';
     }
     
-    // Operating activities - match NetSuite account names
-    if (accountLower.includes('accounts receivable') || accountLower.includes('total accounts receivable') ||
-        accountLower.includes('total - 12000 - receivables')) {
+    // Operating activities
+    if (accountLower.includes('receivable')) {
         return { category: 'operating', lineItem: 'Accounts receivable' };
     }
-    if (accountLower.includes('prepaid') || accountLower.includes('total - 13000 - prepaid') ||
-        accountLower.includes('total other current asset')) {
+    if (accountLower.includes('prepaid')) {
         return { category: 'operating', lineItem: 'Prepaid expenses and other assets' };
     }
-    if (accountLower.includes('other current assets') || accountLower.includes('total - 14000 - other current assets') ||
-        accountLower.includes('total other assets')) {
-        return { category: 'operating', lineItem: 'Other assets' };
-    }
-    if (accountLower.includes('accounts payable') || accountLower.includes('total accounts payable')) {
+    if (accountLower.includes('payable')) {
         return { category: 'operating', lineItem: 'Accounts payable' };
     }
-    if (accountLower.includes('accrued') || accountLower.includes('other current liability') ||
-        accountLower.includes('total other current liability') || accountLower.includes('credit card') ||
-        accountLower.includes('total credit card') || accountLower.includes('payroll') ||
-        accountLower.includes('wages') || accountLower.includes('benefits')) {
+    if (accountLower.includes('accrued') || accountLower.includes('liability')) {
         return { category: 'operating', lineItem: 'Accrued expenses and other liabilities' };
     }
-    if (accountLower.includes('deferred revenue') || accountLower.includes('21000 - deferred revenue')) {
+    if (accountLower.includes('deferred revenue')) {
         return { category: 'operating', lineItem: 'Deferred revenue' };
     }
-    if (accountLower.includes('depreciation') || accountLower.includes('amortization') || 
-        accountLower.includes('ad -') || accountLower.includes('15210 - ad -') || 
-        accountLower.includes('15220 - ad -')) {
+    if (accountLower.includes('depreciation') || accountLower.includes('amortization')) {
         return { category: 'operating', lineItem: 'Depreciation and amortization expense' };
     }
     
-    // Investing activities - match NetSuite patterns
+    // Investing activities
     if (accountLower.includes('equipment') || accountLower.includes('property') || 
-        accountLower.includes('computer') || accountLower.includes('furniture') ||
-        accountLower.includes('fixed assets') || accountLower.includes('total fixed assets')) {
+        accountLower.includes('computer') || accountLower.includes('furniture')) {
         return { category: 'investing', lineItem: 'Purchases of property and equipment' };
     }
     
-    // Financing activities - match NetSuite patterns
-    if (accountLower.includes('stock') || accountLower.includes('equity') || 
-        accountLower.includes('common stock') || accountLower.includes('paid-in capital') ||
-        accountLower.includes('additional paid-in capital') || accountLower.includes('30001 - additional paid-in capital') ||
-        accountLower.includes('series') || accountLower.includes('preferred stock') ||
-        accountLower.includes('total - equity') || accountLower.includes('3200 - z_opening balance')) {
-        if (accountLower.includes('issuance') || accountLower.includes('proceeds') ||
-            accountLower.includes('additional paid-in capital')) {
+    // Financing activities
+    if (accountLower.includes('stock') || accountLower.includes('equity')) {
+        if (accountLower.includes('issuance') || accountLower.includes('proceeds')) {
             return { category: 'financing', lineItem: 'Proceeds from stock issuance' };
         } else {
             return { category: 'financing', lineItem: 'Other equity transactions' };
         }
+    }
+    
+    // Default to other assets for operating
+    if (typeLower.includes('asset')) {
+        return { category: 'operating', lineItem: 'Other assets' };
     }
     
     return 'skip';
@@ -255,7 +278,7 @@ function generateCashFlowStatement(records, incomeData = null) {
         financing: {}
     };
     
-    // Use provided income data if available
+    // Use provided income data if available, otherwise detect format and parse
     let netIncome = 0;
     let beginningCash = 0;
     let actualEndingCash = 0;
@@ -263,6 +286,7 @@ function generateCashFlowStatement(records, incomeData = null) {
     let interestIncome = 0;
     
     if (incomeData) {
+        // Use provided income data from separate income statement file
         netIncome = incomeData.netIncome || 0;
         interestIncome = incomeData.interestIncome || 0;
         dividendIncome = incomeData.dividendIncome || 0;
@@ -275,19 +299,9 @@ function generateCashFlowStatement(records, incomeData = null) {
     }
     
     // Process balance sheet records for cash and working capital changes
-    console.log('Processing', records.length, 'balance sheet records');
-    console.log('Sample record keys:', records.length > 0 ? Object.keys(records[0]) : 'No records');
-    
     for (const record of records) {
-        // Debug: Log records that might be cash-related
-        if (record['Financial Row'] && record['Financial Row'].toLowerCase().includes('cash')) {
-            console.log('Cash-related record:', record['Financial Row'], record);
-        }
-        
-        // Extract beginning and ending cash from Total Bank or Total Cash accounts
-        if (record['Financial Row'] && 
-            (record['Financial Row'].toLowerCase().includes('total - 11000 - cash and cash equivalents') ||
-             record['Financial Row'].toLowerCase().includes('total bank'))) {
+        // Extract beginning and ending cash from Total Bank
+        if (record['Financial Row'] && record['Financial Row'].toLowerCase().includes('total - 11000 - cash and cash equivalents')) {
             beginningCash = parseAmount(record['Comparison Amount (As of Mar 2025)']) || 0;
             actualEndingCash = parseAmount(record['Amount (As of Jun 2025)']) || 0;
             console.log('Found Total Cash:', record['Financial Row'], 'Beginning:', beginningCash, 'Ending:', actualEndingCash);
@@ -296,8 +310,6 @@ function generateCashFlowStatement(records, incomeData = null) {
         if (!record['Variance'] || parseAmount(record['Variance']) === 0) continue;
         
         const categorization = categorizeAccount(record['Financial Row'], record['Account Type']);
-        console.log('Account:', record['Financial Row'], 'Categorization:', categorization, 'Variance:', record['Variance']);
-        
         if (categorization === 'cash' || categorization === 'skip') continue;
         
         const variance = parseAmount(record['Variance']);
@@ -310,6 +322,8 @@ function generateCashFlowStatement(records, incomeData = null) {
             }
             
             // For balance sheet items, the variance represents the change
+            // For assets: increase = use of cash (negative), decrease = source of cash (positive)
+            // For liabilities/equity: increase = source of cash (positive), decrease = use of cash (negative)
             let adjustedAmount = variance;
             
             // Reverse sign for asset accounts (AR, prepaid, etc.)
@@ -324,14 +338,13 @@ function generateCashFlowStatement(records, incomeData = null) {
             }
             
             lineItems[category][lineItem] += adjustedAmount;
-            console.log('Added to', category, lineItem, ':', adjustedAmount, 'Total now:', lineItems[category][lineItem]);
         }
     }
     
-    // Build operating activities
+    // Build operating activities with exact format
     const operatingActivities = [];
     
-    // Start with net loss
+    // Start with net loss (use actual amounts)
     operatingActivities.push({ 
         description: netIncome < 0 ? 'Net loss' : 'Net income', 
         amount: netIncome, 
@@ -346,7 +359,7 @@ function generateCashFlowStatement(records, incomeData = null) {
         isHeader: true 
     });
     
-    // Add depreciation and amortization
+    // Add depreciation and amortization from actual data
     if (lineItems.operating['Depreciation and amortization expense']) {
         operatingActivities.push({ 
             description: 'Depreciation and amortization expense', 
@@ -356,12 +369,12 @@ function generateCashFlowStatement(records, incomeData = null) {
         });
     }
     
-    // Add interest and dividend income adjustments
+    // Add dividend and interest income adjustments (non-cash items to be deducted)
     const totalInterestDividendIncome = (interestIncome || 0) + (dividendIncome || 0);
     if (totalInterestDividendIncome > 0) {
         operatingActivities.push({ 
             description: 'Interest and dividend income received', 
-            amount: -totalInterestDividendIncome,
+            amount: -totalInterestDividendIncome, // Negative because it's a deduction from net income
             isAdjustment: true,
             source: ''
         });
@@ -410,6 +423,7 @@ function generateCashFlowStatement(records, incomeData = null) {
     // Build investing activities
     const investingActivities = [];
     
+    // Add investing items from actual extracted data
     if (lineItems.investing['Purchases of property and equipment'] && lineItems.investing['Purchases of property and equipment'] !== 0) {
         investingActivities.push({ 
             description: 'Purchases of property and equipment', 
@@ -432,6 +446,7 @@ function generateCashFlowStatement(records, incomeData = null) {
     // Build financing activities
     const financingActivities = [];
     
+    // Add financing items from actual extracted data
     if (lineItems.financing['Proceeds from stock issuance'] && lineItems.financing['Proceeds from stock issuance'] !== 0) {
         financingActivities.push({ 
             description: 'Proceeds from stock issuance', 
@@ -463,7 +478,7 @@ function generateCashFlowStatement(records, incomeData = null) {
     // Calculate net change in cash
     const netCashChange = operatingTotal + investingTotal + financingTotal;
     
-    // Calculate ending cash
+    // Calculate ending cash as beginning cash + net cash change (formula)
     const endingCash = beginningCash + netCashChange;
     
     return {
@@ -479,16 +494,10 @@ function generateCashFlowStatement(records, incomeData = null) {
     };
 }
 
-// Main handler
+// Upload handler
 export default async function handler(req, res) {
-    console.log('=== CSV GENERATOR ENDPOINT CALLED ===');
-    console.log('Method:', req.method);
-    console.log('URL:', req.url);
-    console.log('Headers:', JSON.stringify(req.headers, null, 2));
-    
     if (req.method !== 'POST') {
-        console.log('Method not allowed:', req.method);
-        return res.status(405).json({ error: 'Method not allowed' });
+        return res.status(405).send('Method not allowed');
     }
     
     return new Promise((resolve) => {
@@ -496,41 +505,79 @@ export default async function handler(req, res) {
         
         form.parse(req, async (err, fields, files) => {
             if (err) {
-                console.error('Form parsing error:', err);
+                console.error('Formidable error:', err);
                 res.status(400).json({ error: 'Error uploading files', details: err.message });
                 return resolve();
             }
             
             console.log('Files received:', Object.keys(files));
             
+            if (!files.balanceSheetFile || !files.incomeStatementFile) {
+                res.status(400).json({ error: 'Both balance sheet and income statement files are required' });
+                return resolve();
+            }
+            
             try {
-                // Parse both CSV files
+                console.log('Starting file processing...');
+                
+                // Parse both CSV files - formidable returns arrays, so get first element
                 const balanceSheetFile = Array.isArray(files.balanceSheetFile) ? files.balanceSheetFile[0] : files.balanceSheetFile;
                 const incomeStatementFile = Array.isArray(files.incomeStatementFile) ? files.incomeStatementFile[0] : files.incomeStatementFile;
                 
-                if (!balanceSheetFile || !incomeStatementFile) {
-                    throw new Error('Both balance sheet and income statement files are required');
-                }
+                console.log('Files received:', {
+                    balanceSheet: {
+                        filename: balanceSheetFile.originalFilename,
+                        size: balanceSheetFile.size,
+                        mimetype: balanceSheetFile.mimetype
+                    },
+                    incomeStatement: {
+                        filename: incomeStatementFile.originalFilename,
+                        size: incomeStatementFile.size,
+                        mimetype: incomeStatementFile.mimetype
+                    }
+                });
                 
                 console.log('Reading file contents...');
+                // Read file contents from disk (formidable saves to temp files)
                 const balanceSheetBuffer = fs.readFileSync(balanceSheetFile.filepath);
                 const incomeStatementBuffer = fs.readFileSync(incomeStatementFile.filepath);
                 
                 console.log('Parsing CSV files...');
                 const [balanceSheetRecords, incomeStatementRecords] = await Promise.all([
-                    parseCSVFile(balanceSheetBuffer, 'balanceSheet'),
-                    parseCSVFile(incomeStatementBuffer, 'incomeStatement')
+                    parseCSVFile(balanceSheetBuffer, 'balanceSheet').catch(err => {
+                        console.error('Balance sheet parsing error:', err);
+                        throw new Error(`Balance sheet parsing failed: ${err.message}`);
+                    }),
+                    parseCSVFile(incomeStatementBuffer, 'incomeStatement').catch(err => {
+                        console.error('Income statement parsing error:', err);
+                        throw new Error(`Income statement parsing failed: ${err.message}`);
+                    })
                 ]);
                 
+                console.log('Parsing completed:', {
+                    balanceSheetRecords: balanceSheetRecords.length,
+                    incomeStatementRecords: incomeStatementRecords.length
+                });
+                
                 console.log('Generating cash flow statement...');
+                // Generate cash flow statement using both datasets
                 const cashFlow = generateCashFlowStatementFromBothFiles(balanceSheetRecords, incomeStatementRecords);
                 
-                // Generate CSV content
-                const csvContent = createCSVContent(cashFlow);
+                // Create CSV file
+                const csvContent = createCSVFile(cashFlow);
                 
-                console.log('=== SENDING CSV RESPONSE ===');
-                console.log('CSV Content Length:', csvContent.length);
-                console.log('CSV Preview:', csvContent.substring(0, 200));
+                console.log('Generated CSV content length:', csvContent.length);
+                console.log('CSV content preview:', csvContent.substring(0, 200));
+                
+                // Send CSV file with explicit headers and timestamp to avoid caching
+                const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+                const filename = `cash_flow_statement_${timestamp}.csv`;
+                res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+                res.setHeader('Content-Disposition', 'attachment; filename="cash_flow_statement_final.csv"');
+                res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+                res.setHeader('Pragma', 'no-cache');
+                res.setHeader('Expires', '0');
+                res.send(csvContent);
                 
                 // Clean up temporary files
                 try {
@@ -540,26 +587,21 @@ export default async function handler(req, res) {
                     console.warn('File cleanup error:', cleanupError.message);
                 }
                 
-                // Set headers with extreme specificity
-                res.writeHead(200, {
-                    'Content-Type': 'text/csv; charset=utf-8',
-                    'Content-Disposition': 'attachment; filename="cash_flow_test.csv"',
-                    'Content-Length': Buffer.byteLength(csvContent, 'utf8'),
-                    'Cache-Control': 'no-cache, no-store, must-revalidate',
-                    'Pragma': 'no-cache',
-                    'Expires': '0',
-                    'X-Content-Type-Options': 'nosniff'
+            } catch (error) {
+                console.error('Error processing files:', {
+                    message: error.message,
+                    stack: error.stack,
+                    name: error.name
                 });
                 
-                res.end(csvContent, 'utf8');
+                // Send detailed error response
+                const errorMessage = `Error processing files: ${error.message}`;
+                console.error('Sending error response:', errorMessage);
                 
-                console.log('=== CSV RESPONSE SENT ===');
-                
-            } catch (error) {
-                console.error('Processing error:', error);
                 res.status(500).json({
                     error: 'Processing failed',
-                    message: error.message
+                    message: errorMessage,
+                    details: error.name
                 });
             }
             
