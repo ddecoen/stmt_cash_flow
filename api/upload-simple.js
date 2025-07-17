@@ -3,6 +3,7 @@ const ExcelJS = require('exceljs');
 const { IncomingForm } = require('formidable');
 const { Readable } = require('stream');
 const fs = require('fs');
+const { CashFlowService } = require('../services/firestore');
 
 // API configuration for formidable
 export const config = {
@@ -562,6 +563,36 @@ export default async function handler(req, res) {
                 console.log('Generating cash flow statement...');
                 // Generate cash flow statement using both datasets
                 const cashFlow = generateCashFlowStatementFromBothFiles(balanceSheetRecords, incomeStatementRecords);
+                
+                // Save to Firestore
+                try {
+                    const cashFlowService = new CashFlowService();
+                    const savedStatement = await cashFlowService.saveCashFlowStatement({
+                        statementData: cashFlow,
+                        filename: `${balanceSheetFile.originalFilename || 'balance_sheet'}_${incomeStatementFile.originalFilename || 'income_statement'}`,
+                        metadata: {
+                            balanceSheetFile: balanceSheetFile.originalFilename,
+                            incomeStatementFile: incomeStatementFile.originalFilename,
+                            processedAt: new Date().toISOString(),
+                            recordCounts: {
+                                balanceSheet: balanceSheetRecords.length,
+                                incomeStatement: incomeStatementRecords.length
+                            }
+                        },
+                        source: 'web_upload'
+                    });
+                    console.log('Cash flow statement saved to Firestore with ID:', savedStatement.id);
+                    
+                    // Also save the processed data for history
+                    await cashFlowService.saveProcessedData(
+                        `${balanceSheetFile.originalFilename}_${incomeStatementFile.originalFilename}`,
+                        { balanceSheetRecords, incomeStatementRecords },
+                        cashFlow
+                    );
+                } catch (firestoreError) {
+                    console.error('Error saving to Firestore:', firestoreError);
+                    // Continue with CSV generation even if Firestore fails
+                }
                 
                 // Create CSV file
                 const csvContent = createCSVFile(cashFlow);
