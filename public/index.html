@@ -99,6 +99,47 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+        .saved-statements-section {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #ddd;
+        }
+        .saved-statements-section h2 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        .statements-container {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .statement-item {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 10px;
+        }
+        .statement-item h4 {
+            margin: 0 0 10px 0;
+            color: #495057;
+        }
+        .statement-item p {
+            margin: 5px 0;
+            font-size: 14px;
+            color: #6c757d;
+        }
+        .btn-secondary {
+            background-color: #6c757d;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .btn-secondary:hover {
+            background-color: #5a6268;
+        }
     </style>
 </head>
 <body>
@@ -138,6 +179,13 @@
         </div>
 
         <div class="result" id="result"></div>
+        
+        <div class="saved-statements-section">
+            <h2>Previously Generated Statements</h2>
+            <div id="saved-statements" class="statements-container">
+                <p>Loading saved statements...</p>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -216,6 +264,46 @@
             result.className = `result ${type}`;
             result.style.display = 'block';
         }
+
+        // Load and display saved statements
+        async function loadSavedStatements() {
+            try {
+                const response = await fetch('/api/get-statements');
+                if (response.ok) {
+                    const data = await response.json();
+                    displaySavedStatements(data.statements);
+                }
+            } catch (error) {
+                console.error('Error loading saved statements:', error);
+            }
+        }
+
+        function displaySavedStatements(statements) {
+            const container = document.getElementById('saved-statements');
+            if (!statements || statements.length === 0) {
+                container.innerHTML = '<p>No saved statements found.</p>';
+                return;
+            }
+
+            const html = statements.map(statement => `
+                <div class="statement-item">
+                    <h4>${statement.filename || 'Untitled'}</h4>
+                    <p><strong>Created:</strong> ${new Date(statement.createdAt?.seconds * 1000 || Date.now()).toLocaleDateString()}</p>
+                    <p><strong>Records:</strong> Balance Sheet: ${statement.metadata?.recordCounts?.balanceSheet || 'N/A'}, Income Statement: ${statement.metadata?.recordCounts?.incomeStatement || 'N/A'}</p>
+                    <button onclick="viewStatement('${statement.id}')" class="btn-secondary">View Details</button>
+                </div>
+            `).join('');
+
+            container.innerHTML = html;
+        }
+
+        function viewStatement(id) {
+            // This could open a modal or navigate to a detail page
+            alert(`Viewing statement ${id} - This feature can be expanded to show full details`);
+        }
+
+        // Load saved statements when page loads
+        document.addEventListener('DOMContentLoaded', loadSavedStatements);
     </script>
 </body>
 </html>

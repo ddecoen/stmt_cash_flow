@@ -10,12 +10,15 @@ A Go web application that processes NetSuite CSV exports and generates GAAP-comp
 - **Three Activity Categories**: Automatically categorizes balance sheet changes into Operating, Investing, and Financing activities
 - **Excel Export**: Creates professionally formatted Excel files with proper styling
 - **Web Interface**: User-friendly drag-and-drop file upload interface
+- **Firestore Integration**: Automatically saves generated cash flow statements to Firebase Firestore for persistence and history tracking
+- **Statement History**: View previously generated cash flow statements with metadata
 - **Vercel Ready**: Configured for serverless deployment on Vercel
 
 ## Prerequisites
 
-- Go 1.19 or later
+- Node.js 18.0 or later
 - Git
+- Firebase project with Firestore enabled
 - Vercel CLI (for deployment)
 
 ## Local Development
@@ -27,23 +30,51 @@ git clone https://github.com/ddecoen/stmt_cash_flow.git
 cd stmt_cash_flow
 ```
 
-### 2. Install Dependencies
+### 2. Firebase Setup
+
+1. Create a Firebase project at [Firebase Console](https://console.firebase.google.com/)
+2. Enable Firestore Database in your Firebase project
+3. Create a service account key:
+   - Go to Project Settings > Service Accounts
+   - Click "Generate new private key"
+   - Download the JSON file
+4. Set up environment variables (see step 4 below)
+
+### 3. Install Dependencies
 
 ```bash
-go mod tidy
+npm install
 ```
 
-### 3. Run the Application
+### 4. Environment Variables Setup
+
+1. Copy the example environment file:
+```bash
+cp .env.example .env
+```
+
+2. Edit `.env` and add your Firebase configuration:
+```bash
+FIREBASE_API_KEY=your_api_key_here
+FIREBASE_AUTH_DOMAIN=your_project_id.firebaseapp.com
+FIREBASE_PROJECT_ID=your_project_id
+FIREBASE_STORAGE_BUCKET=your_project_id.appspot.com
+FIREBASE_MESSAGING_SENDER_ID=your_sender_id
+FIREBASE_APP_ID=your_app_id
+FIREBASE_SERVICE_ACCOUNT_KEY='{"type":"service_account","project_id":"your_project_id",...}'
+```
+
+### 5. Run the Application
 
 ```bash
-go run .
+npm run dev
 ```
 
-The application will start on `http://localhost:8080`
+The application will start on `http://localhost:3000`
 
 ### 4. Test the Application
 
-1. Open your browser and navigate to `http://localhost:8080`
+1. Open your browser and navigate to `http://localhost:3000`
 2. Upload a NetSuite CSV file using the web interface
 3. Download the generated Excel cash flow statement
 
