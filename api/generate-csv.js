@@ -177,44 +177,56 @@ function categorizeAccount(account, accountType) {
         return 'cash';
     }
     
-    // Operating activities
-    if (accountLower.includes('receivable')) {
+    // Operating activities - match NetSuite account names
+    if (accountLower.includes('accounts receivable') || accountLower.includes('total accounts receivable') ||
+        accountLower.includes('total - 12000 - receivables')) {
         return { category: 'operating', lineItem: 'Accounts receivable' };
     }
-    if (accountLower.includes('prepaid')) {
+    if (accountLower.includes('prepaid') || accountLower.includes('total - 13000 - prepaid') ||
+        accountLower.includes('total other current asset')) {
         return { category: 'operating', lineItem: 'Prepaid expenses and other assets' };
     }
-    if (accountLower.includes('payable')) {
+    if (accountLower.includes('other current assets') || accountLower.includes('total - 14000 - other current assets') ||
+        accountLower.includes('total other assets')) {
+        return { category: 'operating', lineItem: 'Other assets' };
+    }
+    if (accountLower.includes('accounts payable') || accountLower.includes('total accounts payable')) {
         return { category: 'operating', lineItem: 'Accounts payable' };
     }
-    if (accountLower.includes('accrued') || accountLower.includes('liability')) {
+    if (accountLower.includes('accrued') || accountLower.includes('other current liability') ||
+        accountLower.includes('total other current liability') || accountLower.includes('credit card') ||
+        accountLower.includes('total credit card') || accountLower.includes('payroll') ||
+        accountLower.includes('wages') || accountLower.includes('benefits')) {
         return { category: 'operating', lineItem: 'Accrued expenses and other liabilities' };
     }
-    if (accountLower.includes('deferred revenue')) {
+    if (accountLower.includes('deferred revenue') || accountLower.includes('21000 - deferred revenue')) {
         return { category: 'operating', lineItem: 'Deferred revenue' };
     }
-    if (accountLower.includes('depreciation') || accountLower.includes('amortization')) {
+    if (accountLower.includes('depreciation') || accountLower.includes('amortization') || 
+        accountLower.includes('ad -') || accountLower.includes('15210 - ad -') || 
+        accountLower.includes('15220 - ad -')) {
         return { category: 'operating', lineItem: 'Depreciation and amortization expense' };
     }
     
-    // Investing activities
+    // Investing activities - match NetSuite patterns
     if (accountLower.includes('equipment') || accountLower.includes('property') || 
-        accountLower.includes('computer') || accountLower.includes('furniture')) {
+        accountLower.includes('computer') || accountLower.includes('furniture') ||
+        accountLower.includes('fixed assets') || accountLower.includes('total fixed assets')) {
         return { category: 'investing', lineItem: 'Purchases of property and equipment' };
     }
     
-    // Financing activities
-    if (accountLower.includes('stock') || accountLower.includes('equity')) {
-        if (accountLower.includes('issuance') || accountLower.includes('proceeds')) {
+    // Financing activities - match NetSuite patterns
+    if (accountLower.includes('stock') || accountLower.includes('equity') || 
+        accountLower.includes('common stock') || accountLower.includes('paid-in capital') ||
+        accountLower.includes('additional paid-in capital') || accountLower.includes('30001 - additional paid-in capital') ||
+        accountLower.includes('series') || accountLower.includes('preferred stock') ||
+        accountLower.includes('total - equity') || accountLower.includes('3200 - z_opening balance')) {
+        if (accountLower.includes('issuance') || accountLower.includes('proceeds') ||
+            accountLower.includes('additional paid-in capital')) {
             return { category: 'financing', lineItem: 'Proceeds from stock issuance' };
         } else {
             return { category: 'financing', lineItem: 'Other equity transactions' };
         }
-    }
-    
-    // Default to other assets for operating
-    if (typeLower.includes('asset')) {
-        return { category: 'operating', lineItem: 'Other assets' };
     }
     
     return 'skip';
@@ -272,8 +284,10 @@ function generateCashFlowStatement(records, incomeData = null) {
             console.log('Cash-related record:', record['Financial Row'], record);
         }
         
-        // Extract beginning and ending cash from Total Bank
-        if (record['Financial Row'] && record['Financial Row'].toLowerCase().includes('total - 11000 - cash and cash equivalents')) {
+        // Extract beginning and ending cash from Total Bank or Total Cash accounts
+        if (record['Financial Row'] && 
+            (record['Financial Row'].toLowerCase().includes('total - 11000 - cash and cash equivalents') ||
+             record['Financial Row'].toLowerCase().includes('total bank'))) {
             beginningCash = parseAmount(record['Comparison Amount (As of Mar 2025)']) || 0;
             actualEndingCash = parseAmount(record['Amount (As of Jun 2025)']) || 0;
             console.log('Found Total Cash:', record['Financial Row'], 'Beginning:', beginningCash, 'Ending:', actualEndingCash);
